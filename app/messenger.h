@@ -3,6 +3,10 @@
  *
  * Modified work Copyright 2024 kamilsss655
  * https://github.com/kamilsss655
+ * 
+ * Modified for APRS Copyright 2025 gvJaime
+ * https://github.com/elgambitero
+ * https://github.com/gvJaime
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,9 +32,10 @@
 #include "driver/keyboard.h"
 
 enum {
-	NONCE_LENGTH = 13,
-	PAYLOAD_LENGTH = 30
+	PAYLOAD_LENGTH = 30 // APRS Maxes out at 256
 };
+
+extern char srcCallsign[8] = "EA4IAU7";
 
 typedef enum KeyboardType {
 	UPPERCASE,
@@ -66,17 +71,30 @@ typedef enum ModemModulation {
   MOD_AFSK_1200  // for good conditions
 } ModemModulation;
 
-// Data Packet definition                            // 2024 kamilsss655
+// AX.25 constants
+#define AX25_FLAG            0x7E
+#define AX25_CONTROL_UI      0x03
+#define AX25_PID_NO_LAYER3   0xF0
+#define AX25_FCS_POLY        0x8408  // Reversed polynomial for CRC-16-CCITT
+
+typedef struct {
+  uint8_t start_flag; // for alignment purposes
+  uint8_t dest[7];     // Destination callsign field (7 bytes)
+  uint8_t source[7];   // Source callsign field (7 bytes)
+  uint8_t digis[56];   // digipeater callsigns
+  uint8_t control;     // Control field (UI frame)
+  uint8_t pid;         // PID field (No layer 3)
+  uint8_t payload[PAYLOAD_LENGTH]; // APRS text payload
+  uint16_t fcs;        // Frame Check Sequence (CRC)
+  uint8_t end_flag; // for alignment purposes
+} AX25Frame;
+
+// AX25 Data Packet definition 
 union DataPacket
 {
-  struct{
-    uint8_t header;
-    uint8_t payload[PAYLOAD_LENGTH];
-    unsigned char nonce[NONCE_LENGTH];
-    // uint8_t signature[SIGNATURE_LENGTH];
-  } data;
-  // header + payload + nonce = must be an even number
-  uint8_t serializedArray[1+PAYLOAD_LENGTH+NONCE_LENGTH];
+  AX25Frame ax25;
+  // aligned for serialized access
+  uint8_t serializedArray[sizeof(AX25Frame)];
 };
 
 // MessengerConfig                            // 2024 kamilsss655

@@ -3,6 +3,9 @@
  *
  * Modified work Copyright 2024 kamilsss655
  * https://github.com/kamilsss655
+ * 
+ * Modified for APRS Copyright 2025 gvJaime
+ * https://github.com/elgambitero
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,6 +20,7 @@
  *     limitations under the License.
  */
 
+#define ENABLE_MESSENGER
 #ifdef ENABLE_MESSENGER
 
 #include <string.h>
@@ -65,6 +69,7 @@ char rxMessage[4][PAYLOAD_LENGTH + 2];
 unsigned char cIndex = 0;
 unsigned char prevKey = 0, prevLetter = 0;
 KeyboardType keyboardType = UPPERCASE;
+uint8_t msgCount = 100; // count to be incremented
 
 MsgStatus msgStatus = READY;
 
@@ -77,6 +82,63 @@ uint8_t hasNewMessage = 0;
 uint8_t keyTickCounter = 0;
 
 // -----------------------------------------------------
+
+
+// --------------------------------------------------------------------
+// AX.25 Helper Functions
+
+// Encodes a callsign and SSID into the 7-byte AX.25 address field.
+// The first 6 bytes: callsign (left-justified, padded with spaces, then shifted left by one).
+// The 7th byte: (SSID (4 bits) << 1) OR 0x60.
+void ax25_encode_address(uint8_t *out, const char *callsign, uint8_t ssid) {
+    memset(out, ' ', 6);
+    size_t len = strlen(callsign);
+    if (len > 6) len = 6;
+    memcpy(out, callsign, len);
+    for (int i = 0; i < 6; i++) {
+        out[i] <<= 1;
+    }
+    out[6] = ((ssid & 0x0F) << 1) | 0x60;
+}
+
+// Updates the CRC for one byte.
+static uint16_t ax25_crc_update(uint16_t crc, uint8_t byte) {
+    crc ^= byte;
+    for (int i = 0; i < 8; i++) {
+        if (crc & 1)
+            crc = (crc >> 1) ^ AX25_FCS_POLY;
+        else
+            crc >>= 1;
+    }
+    return crc;
+}
+
+// Computes the Frame Check Sequence (CRC-16) over the provided data.
+uint16_t ax25_compute_fcs(const uint8_t *data, size_t len) {
+    uint16_t crc = 0xFFFF;
+    for (size_t i = 0; i < len; i++)
+        crc = ax25_crc_update(crc, data[i]);
+    return ~crc;
+}
+
+// Serializes the AX.25 frame into the union's serializedArray.
+// Format: [FLAG][dest][source][control][pid][payload][fcs][FLAG]
+void ax25_set_fcs(union DataPacket *packet) {
+    // Compute FCS over dest, source, control, digis, pid, and payload (excluding start flag)
+    uint16_t crc = ax25_compute_fcs(&packet->serializedArray[1], sizeof(AX25Frame) - 3);
+    packet->ax25.fcs = crc;
+}
+
+uint8_t is_ack(union DataPacket dataPacket) {
+    const uint8_t *p = dataPacket.ax25.payload;
+    // Check that the payload starts with ':' and the fixed sequence ":ack" is at the correct offset.
+    if (p[0] != ':' || memcmp(&p[10], ":ack", 4) != 0)
+        return 0;
+    // Check that the message number (starting at index 14) is not empty.
+    if (p[14] == ' ' || p[14] == '\0')
+        return 0;
+    return 1;
+}
 
 void MSG_FSKSendData() {
 
@@ -205,7 +267,7 @@ void MSG_SendPacket() {
 		return;
 	} 
 
-	if ( strlen((char *)dataPacket.data.payload) > 0) {
+	if ( strlen((char *)dataPacket.ax25.payload) > 0) {
 
 		msgStatus = SENDING;
 
@@ -214,11 +276,11 @@ void MSG_SendPacket() {
 		BK4819_ToggleGpioOut(BK4819_GPIO5_PIN1_RED, true);
 
 		// display sent message (before encryption)
-		if (dataPacket.data.header != ACK_PACKET) {
+		if (!is_ack(dataPacket)) {
 			moveUP(rxMessage);
-			sprintf(rxMessage[3], "> %s", dataPacket.data.payload);
+			sprintf(rxMessage[3], "> %s", dataPacket.ax25.payload);
 			memset(lastcMessage, 0, sizeof(lastcMessage));
-			memcpy(lastcMessage, dataPacket.data.payload, PAYLOAD_LENGTH);
+			memcpy(lastcMessage, dataPacket.ax25.payload, PAYLOAD_LENGTH);
 			cIndex = 0;
 			prevKey = 0;
 			prevLetter = 0;
@@ -337,6 +399,10 @@ void MSG_Init() {
 	memset(rxMessage, 0, sizeof(rxMessage));
 	memset(cMessage, 0, sizeof(cMessage));
 	memset(lastcMessage, 0, sizeof(lastcMessage));
+    dataPacket.ax25.start_flag = AX25_FLAG;
+    dataPacket.ax25.control = AX25_CONTROL_UI;
+    dataPacket.ax25.pid = AX25_PID_NO_LAYER3;
+    dataPacket.ax25.end_flag = AX25_FLAG;
 	hasNewMessage = 0;
 	msgStatus = READY;
 	prevKey = 0;
@@ -347,11 +413,20 @@ void MSG_Init() {
 	#endif
 }
 
-void MSG_SendAck() {
-	// in the future we might reply with received payload and then the sending radio
-	// could compare it and determine if the messegage was read correctly (kamilsss655)
+uint8_t msg_id[5];
+uint8_t ack_dst[7];
+
+void MSG_SendAck(union DataPacket received_packet) {
+    // get
+    strcpy(msg_id, received_packet.ax25.payload + 14);
+    memcpy(ack_dst, dataPacket.ax25.source, 7);
+
 	MSG_ClearPacketBuffer();
-	dataPacket.data.header = ACK_PACKET;
+
+
+
+
+	dataPacket.a.header = ACK_PACKET;
 	// sending only empty header seems to not work, so set few bytes of payload to increase reliability (kamilsss655)
 	memset(dataPacket.data.payload, 255, 5);
 	MSG_SendPacket();
@@ -414,7 +489,7 @@ void MSG_HandleReceive(){
 		SYSTEM_DelayMs(700);
 
 		if(gEeprom.MESSENGER_CONFIG.data.ack)
-			MSG_SendAck();
+			MSG_SendAck(dataPacket);
 	}
 }
 
@@ -544,8 +619,11 @@ void  MSG_ProcessKeys(KEY_Code_t Key, bool bKeyPressed, bool bKeyHeld) {
 }
 
 void MSG_ClearPacketBuffer()
-{
-	memset(dataPacket.serializedArray, 0, sizeof(dataPacket.serializedArray));
+{ 
+    // Erases destination
+    memset(dataPacket.ax25.dest, 0, 7);
+    // Erases message + FCS
+	memset(dataPacket.ax25.payload, 0, PAYLOAD_LENGTH + 2);
 }
 
 void MSG_Send(const char *cMessage){
