@@ -27,72 +27,53 @@
 #include <string.h>
 #include "driver/keyboard.h"
 
+// For APRS we use a fixed payload length (adjust if needed)
 enum {
-	NONCE_LENGTH = 13,
-	PAYLOAD_LENGTH = 30
+    PAYLOAD_LENGTH = 30
 };
 
-typedef enum KeyboardType {
-	UPPERCASE,
-  	LOWERCASE,
-  	NUMERIC,
-  	END_TYPE_KBRD
-} KeyboardType;
+// AX.25 frame constants
+#define AX25_FLAG            0x7E
+#define AX25_CONTROL_UI      0x03
+#define AX25_PID_NO_LAYER3   0xF0
+#define AX25_FCS_POLY        0x8408  // reversed polynomial (CRC-16-CCITT)
 
-extern KeyboardType keyboardType;
-extern uint16_t gErrorsDuringMSG;
-extern char cMessage[PAYLOAD_LENGTH];
-extern char rxMessage[4][PAYLOAD_LENGTH + 2];
-extern uint8_t hasNewMessage;
-extern uint8_t keyTickCounter;
+// Total serialized frame size calculation:
+//   start flag (1) + dest (7) + source (7) + control (1) + pid (1) +
+//   payload (PAYLOAD_LENGTH) + fcs (2) + end flag (1)
+#define AX25_FRAME_SIZE (1 + 7 + 7 + 1 + 1 + PAYLOAD_LENGTH + 2 + 1)
 
-typedef enum MsgStatus {
-    READY,
-    SENDING,
-    RECEIVING,
-} MsgStatus;
-
-typedef enum PacketType {
-    MESSAGE_PACKET = 100u,
-    ENCRYPTED_MESSAGE_PACKET,
-    ACK_PACKET,
-    INVALID_PACKET
-} PacketType;
-
-// Modem Modulation                             // 2024 kamilsss655
-typedef enum ModemModulation {
-  MOD_FSK_450,   // for bad conditions
-  MOD_FSK_700,   // for medium conditions
-  MOD_AFSK_1200  // for good conditions
-} ModemModulation;
-
-// Data Packet definition                            // 2024 kamilsss655
-union DataPacket
-{
-  struct{
-    uint8_t header;
-    uint8_t payload[PAYLOAD_LENGTH];
-    unsigned char nonce[NONCE_LENGTH];
-    // uint8_t signature[SIGNATURE_LENGTH];
-  } data;
-  // header + payload + nonce = must be an even number
-  uint8_t serializedArray[1+PAYLOAD_LENGTH+NONCE_LENGTH];
+// Union DataPacket now holds an AX.25 frame
+union DataPacket {
+    struct {
+        uint8_t dest[7];     // Destination callsign (shifted left, plus SSID in byte 7)
+        uint8_t source[7];   // Source callsign
+        uint8_t control;     // UI frame (0x03)
+        uint8_t pid;         // No layer 3 (0xF0)
+        uint8_t payload[PAYLOAD_LENGTH];  // APRS text payload
+        uint16_t fcs;        // Frame Check Sequence (CRC) in little-endian
+    } ax25;
+    // Serialized array includes start and end flag bytes.
+    uint8_t serializedArray[AX25_FRAME_SIZE];
 };
 
-// MessengerConfig                            // 2024 kamilsss655
+// Messenger configuration (unchanged)
 typedef union {
-  struct {
-    uint8_t
-      receive    :1, // determines whether fsk modem will listen for new messages
-      ack        :1, // determines whether the radio will automatically respond to messages with ACK
-      encrypt    :1, // determines whether outgoing messages will be encrypted
-      unused     :1,
-      modulation :2, // determines FSK modulation type
-      unused2    :2;
-  } data;
-  uint8_t __val;
+    struct {
+        uint8_t
+            receive    :1, // whether FSK modem will listen for new messages
+            ack        :1, // whether to automatically respond with ACK
+            encrypt    :1, // whether outgoing messages will be encrypted
+            unused     :1,
+            modulation :2, // FSK modulation type
+            unused2    :2;
+    } data;
+    uint8_t __val;
 } MessengerConfig;
 
+extern MessengerConfig gMessengerConfig;
+
+// Messaging functions (API remains the same)
 void MSG_EnableRX(const bool enable);
 void MSG_StorePacket(const uint16_t interrupt_bits);
 void MSG_Init();
@@ -105,6 +86,11 @@ void MSG_HandleReceive();
 void MSG_Send(const char *cMessage);
 void MSG_ConfigureFSK(bool rx);
 
-#endif
+// AX.25 helper function prototypes
+void ax25_encode_address(uint8_t *out, const char *callsign, uint8_t ssid);
+uint16_t ax25_compute_fcs(const uint8_t *data, size_t len);
+void ax25_serialize_frame(union DataPacket *packet);
 
-#endif
+#endif // ENABLE_MESSENGER
+
+#endif // APP_MSG_H
