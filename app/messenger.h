@@ -32,41 +32,76 @@ enum {
     PAYLOAD_LENGTH = 30
 };
 
+typedef enum KeyboardType {
+	UPPERCASE,
+  	LOWERCASE,
+  	NUMERIC,
+  	END_TYPE_KBRD
+} KeyboardType;
+
+extern KeyboardType keyboardType;
+extern uint16_t gErrorsDuringMSG;
+extern char cMessage[PAYLOAD_LENGTH];
+extern char rxMessage[4][PAYLOAD_LENGTH + 2];
+extern uint8_t hasNewMessage;
+extern uint8_t keyTickCounter;
+
+
 // AX.25 frame constants
 #define AX25_FLAG            0x7E
 #define AX25_CONTROL_UI      0x03
 #define AX25_PID_NO_LAYER3   0xF0
 #define AX25_FCS_POLY        0x8408  // reversed polynomial (CRC-16-CCITT)
 
-// Total serialized frame size calculation:
+
+typedef enum MsgStatus {
+    READY,
+    SENDING,
+    RECEIVING,
+} MsgStatus;
+
+typedef enum PacketType {
+    MESSAGE_PACKET = 100u,
+    ENCRYPTED_MESSAGE_PACKET,
+    ACK_PACKET,
+    INVALID_PACKET
+} PacketType;
+
+// Modem Modulation                             // 2024 kamilsss655
+typedef enum ModemModulation {
+  MOD_FSK_450,   // for bad conditions
+  MOD_FSK_700,   // for medium conditions
+  MOD_AFSK_1200  // for good conditions
+} ModemModulation;
+
+// Total AX.25 frame size calculation:
 //   start flag (1) + dest (7) + source (7) + control (1) + pid (1) +
-//   payload (PAYLOAD_LENGTH) + fcs (2) + end flag (1)
+//   payload (PAYLOAD_LENGTH) + FCS (2) + end flag (1)
 #define AX25_FRAME_SIZE (1 + 7 + 7 + 1 + 1 + PAYLOAD_LENGTH + 2 + 1)
 
-// Union DataPacket now holds an AX.25 frame
+// Union DataPacket now holds an AX.25 UI frame.
 union DataPacket {
     struct {
-        uint8_t dest[7];     // Destination callsign (shifted left, plus SSID in byte 7)
-        uint8_t source[7];   // Source callsign
-        uint8_t control;     // UI frame (0x03)
-        uint8_t pid;         // No layer 3 (0xF0)
-        uint8_t payload[PAYLOAD_LENGTH];  // APRS text payload
-        uint16_t fcs;        // Frame Check Sequence (CRC) in little-endian
+        uint8_t dest[7];     // Destination callsign field (7 bytes)
+        uint8_t source[7];   // Source callsign field (7 bytes)
+        uint8_t control;     // Control field (UI frame)
+        uint8_t pid;         // PID field (No layer 3)
+        uint8_t payload[PAYLOAD_LENGTH]; // APRS text payload
+        uint16_t fcs;        // Frame Check Sequence (CRC)
     } ax25;
-    // Serialized array includes start and end flag bytes.
+    // Serialized array includes complete AX.25 frame with flag bytes.
     uint8_t serializedArray[AX25_FRAME_SIZE];
 };
 
-// Messenger configuration (unchanged)
+// For messaging configuration (unchanged)
 typedef union {
     struct {
-        uint8_t
-            receive    :1, // whether FSK modem will listen for new messages
-            ack        :1, // whether to automatically respond with ACK
-            encrypt    :1, // whether outgoing messages will be encrypted
-            unused     :1,
-            modulation :2, // FSK modulation type
-            unused2    :2;
+        uint8_t receive    :1, // FSK modem will listen for new messages
+                ack        :1, // Automatically respond with ACK
+                encrypt    :1, // Encrypt outgoing messages
+                unused     :1,
+                modulation :2, // FSK modulation type
+                unused2    :2;
     } data;
     uint8_t __val;
 } MessengerConfig;

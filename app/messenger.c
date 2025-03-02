@@ -53,47 +53,10 @@
 #define AX25_PID_NO_LAYER3   0xF0
 #define AX25_FCS_POLY        0x8408  // Reversed polynomial for CRC-16-CCITT
 
-// We assume a fixed APRS payload length (adjust if needed)
-enum {
-    PAYLOAD_LENGTH = 30
-};
-
-// Total AX.25 frame size calculation:
-//   start flag (1) + dest (7) + source (7) + control (1) + pid (1) +
-//   payload (PAYLOAD_LENGTH) + FCS (2) + end flag (1)
-#define AX25_FRAME_SIZE (1 + 7 + 7 + 1 + 1 + PAYLOAD_LENGTH + 2 + 1)
-
-// Union DataPacket now holds an AX.25 UI frame.
-union DataPacket {
-    struct {
-        uint8_t dest[7];     // Destination callsign field (7 bytes)
-        uint8_t source[7];   // Source callsign field (7 bytes)
-        uint8_t control;     // Control field (UI frame)
-        uint8_t pid;         // PID field (No layer 3)
-        uint8_t payload[PAYLOAD_LENGTH]; // APRS text payload
-        uint16_t fcs;        // Frame Check Sequence (CRC)
-    } ax25;
-    // Serialized array includes complete AX.25 frame with flag bytes.
-    uint8_t serializedArray[AX25_FRAME_SIZE];
-};
-
-// For messaging configuration (unchanged)
-typedef union {
-    struct {
-        uint8_t receive    :1, // FSK modem will listen for new messages
-                ack        :1, // Automatically respond with ACK
-                encrypt    :1, // Encrypt outgoing messages
-                unused     :1,
-                modulation :2, // FSK modulation type
-                unused2    :2;
-    } data;
-    uint8_t __val;
-} MessengerConfig;
-
-MessengerConfig gMessengerConfig;
-
 // --------------------------------------------------------------------
 // Global Variables for Messaging
+
+#define NEXT_CHAR_DELAY 100 // 10ms tick
 
 // Keypad T9 tables and related definitions
 char T9TableLow[9][4] = {
@@ -139,21 +102,12 @@ const uint8_t MSG_BUTTON_STATE_HELD = 1 << 1;
 const uint8_t MSG_BUTTON_EVENT_SHORT = 0;
 const uint8_t MSG_BUTTON_EVENT_LONG  = MSG_BUTTON_STATE_HELD;
 
-char cMessage[PAYLOAD_LENGTH];
 char lastcMessage[PAYLOAD_LENGTH];
-char rxMessage[4][PAYLOAD_LENGTH + 2];
 uint8_t hasNewMessage = 0;
-uint16_t gErrorsDuringMSG;
 uint8_t keyTickCounter = 0;
 unsigned char cIndex = 0;
 unsigned char prevKey = 0, prevLetter = 0;
 KeyboardType keyboardType = UPPERCASE;
-
-typedef enum MsgStatus {
-    READY,
-    SENDING,
-    RECEIVING,
-} MsgStatus;
 
 MsgStatus msgStatus = READY;
 
@@ -521,7 +475,7 @@ void insertCharInMessage(uint8_t key) {
         if (cIndex < MAX_MSG_LENGTH)
             cIndex++;
     }
-    cMessage[cIndex] = '\\0';
+    cMessage[cIndex] = '\0';
     if (keyboardType == NUMERIC) {
         prevKey = 0;
         prevLetter = 0;
@@ -533,7 +487,7 @@ void insertCharInMessage(uint8_t key) {
 // Processes a backspace input.
 void processBackspace() {
     cIndex = (cIndex > 0) ? cIndex - 1 : 0;
-    cMessage[cIndex] = '\\0';
+    cMessage[cIndex] = '\0';
     prevKey = 0;
     prevLetter = 0;
 }
