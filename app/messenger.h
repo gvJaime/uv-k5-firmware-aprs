@@ -32,7 +32,7 @@
 #include "driver/keyboard.h"
 
 enum {
-	PAYLOAD_LENGTH = 30 // APRS Maxes out at 256
+	PAYLOAD_LENGTH = 256
 };
 
 extern char srcCallsign[8] = "EA4IAU7";
@@ -98,17 +98,21 @@ union DataPacket
 };
 
 // MessengerConfig                            // 2024 kamilsss655
-typedef union {
-  struct {
-    uint8_t
-      receive    :1, // determines whether fsk modem will listen for new messages
-      ack        :1, // determines whether the radio will automatically respond to messages with ACK
-      encrypt    :1, // determines whether outgoing messages will be encrypted
-      unused     :1,
-      modulation :2, // determines FSK modulation type
-      unused2    :2;
-  } data;
-  uint8_t __val;
+typedef struct {
+  union {
+    struct {
+      uint8_t
+        receive    :1, // determines whether fsk modem will listen for new messages
+        ack        :1, // determines whether the radio will automatically respond to messages with ACK
+        encrypt    :1, // determines whether outgoing messages will be encrypted
+        unused     :1,
+        modulation :2, // determines FSK modulation type
+        unused2    :2;
+    } data;
+    uint8_t __val;
+  } config_byte;
+  char callsign[7];
+  char digis[23];
 } MessengerConfig;
 
 void MSG_EnableRX(const bool enable);

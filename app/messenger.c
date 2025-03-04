@@ -65,7 +65,7 @@ unsigned char numberOfNumsAssignedToKey[9] = { 1, 1, 1, 1, 1, 1, 1, 1, 1 };
 
 char cMessage[PAYLOAD_LENGTH];
 char lastcMessage[PAYLOAD_LENGTH];
-char rxMessage[4][PAYLOAD_LENGTH + 2];
+char rxMessage[4][PAYLOAD_LENGTH + 8];
 unsigned char cIndex = 0;
 unsigned char prevKey = 0, prevLetter = 0;
 KeyboardType keyboardType = UPPERCASE;
@@ -235,7 +235,7 @@ void MSG_EnableRX(const bool enable) {
 	if (enable) {
 		MSG_ConfigureFSK(true);
 
-		if(gEeprom.MESSENGER_CONFIG.data.receive)
+		if(gEeprom.MESSENGER_CONFIG.config_byte.data.receive)
 			BK4819_FskEnableRx();
 	} else {
 		BK4819_WriteRegister(BK4819_REG_70, 0);
@@ -399,6 +399,7 @@ void MSG_Init() {
 	memset(rxMessage, 0, sizeof(rxMessage));
 	memset(cMessage, 0, sizeof(cMessage));
 	memset(lastcMessage, 0, sizeof(lastcMessage));
+    msg_id[5] = 0;
     dataPacket.ax25.start_flag = AX25_FLAG;
     dataPacket.ax25.control = AX25_CONTROL_UI;
     dataPacket.ax25.pid = AX25_PID_NO_LAYER3;
@@ -413,27 +414,33 @@ void MSG_Init() {
 	#endif
 }
 
-uint8_t msg_id[5];
+uint8_t msg_id[6];
 uint8_t ack_dst[7];
 
-void MSG_SendAck(union DataPacket received_packet) {
-    // get
-    strcpy(msg_id, received_packet.ax25.payload + 14);
+void MSG_SendAck() {
+    char *endPos = strchr(dataPacket.ax25.payload, "{");
+    if(endPos == NULL) {
+        return;
+    }
+
+    memcpy(msg_id, endPos + 1, 5); // not necessarily 0 terminated
     memcpy(ack_dst, dataPacket.ax25.source, 7);
 
 	MSG_ClearPacketBuffer();
 
+    memcpy(dataPacket.ax25.source, gEeprom.MESSENGER_CONFIG.callsign, 7);
+    memcpy(dataPacket.ax25.dest, ack_dst, 7);
 
-
-
-	dataPacket.a.header = ACK_PACKET;
-	// sending only empty header seems to not work, so set few bytes of payload to increase reliability (kamilsss655)
-	memset(dataPacket.data.payload, 255, 5);
+    strcpy(dataPacket.ax25.payload, ":");
+    memcpy(dataPacket.ax25.payload + 1, ack_dst, 7);
+    strcpy(dataPacket.ax25.payload + 10, ":ack");
+    strcpy(dataPacket.ax25.payload + 14, msg_id);
+    
 	MSG_SendPacket();
 }
 
 void MSG_HandleReceive(){
-	if (dataPacket.data.header == ACK_PACKET) {
+	if (is_ack(dataPacket)) {
 	#ifdef ENABLE_MESSENGER_DELIVERY_NOTIFICATION
 		#ifdef ENABLE_MESSENGER_UART
 			UART_printf("SVC<RCPT\r\n");
@@ -443,53 +450,33 @@ void MSG_HandleReceive(){
 		gUpdateDisplay = true;
 	#endif
 	} else {
-		moveUP(rxMessage);
-		if (dataPacket.data.header >= INVALID_PACKET) {
-			snprintf(rxMessage[3], PAYLOAD_LENGTH + 2, "ERROR: INVALID PACKET.");
-		}
-		else
-		{
-			#ifdef ENABLE_ENCRYPTION
-				if(dataPacket.data.header == ENCRYPTED_MESSAGE_PACKET)
-				{
-					CRYPTO_Crypt(dataPacket.data.payload,
-						PAYLOAD_LENGTH,
-						dataPacket.data.payload,
-						&dataPacket.data.nonce,
-						gEncryptionKey,
-						256);
-				}
-				snprintf(rxMessage[3], PAYLOAD_LENGTH + 2, "< %s", dataPacket.data.payload);
-			#else
-				snprintf(rxMessage[3], PAYLOAD_LENGTH + 2, "< %s", dataPacket.data.payload);
-			#endif
-			#ifdef ENABLE_MESSENGER_UART
-				UART_printf("SMS<%s\r\n", dataPacket.data.payload);
-			#endif
-		}
+        if(strncmp(dataPacket.ax25.source, gEeprom.MESSENGER_CONFIG.callsign, 7) == 0) {
+            moveUP(rxMessage);
+            
+            snprintf(rxMessage[3], PAYLOAD_LENGTH, "%.*s: %s", 7, dataPacket.ax25.dest, dataPacket.ax25.payload);
+            #ifdef ENABLE_MESSENGER_UART
+                UART_printf("SMS<%s\r\n", dataPacket.data.payload);
+            #endif
 
-		if ( gScreenToDisplay != DISPLAY_MSG ) {
-			hasNewMessage = 1;
-			gUpdateStatus = true;
-			gUpdateDisplay = true;
-	#ifdef ENABLE_MESSENGER_NOTIFICATION
-			gPlayMSGRing = true;
-	#endif
-		}
-		else {
-			gUpdateDisplay = true;
-		}
-	}
+            if ( gScreenToDisplay != DISPLAY_MSG ) {
+                hasNewMessage = 1;
+                gUpdateStatus = true;
+                gUpdateDisplay = true;
+        #ifdef ENABLE_MESSENGER_NOTIFICATION
+                gPlayMSGRing = true;
+        #endif
+            }
+            else {
+                gUpdateDisplay = true;
+            }
 
-	// Transmit a message to the sender that we have received the message
-	if (dataPacket.data.header == MESSAGE_PACKET ||
-		dataPacket.data.header == ENCRYPTED_MESSAGE_PACKET)
-	{
-		// wait so the correspondent radio can properly receive it
-		SYSTEM_DelayMs(700);
+            // Transmit a message to the sender that we have received the message
+            // wait so the correspondent radio can properly receive it
+            SYSTEM_DelayMs(700);
 
-		if(gEeprom.MESSENGER_CONFIG.data.ack)
-			MSG_SendAck(dataPacket);
+            if(gEeprom.MESSENGER_CONFIG.config_byte.data.ack)
+                MSG_SendAck(dataPacket);
+        }
 	}
 }
 
@@ -620,27 +607,36 @@ void  MSG_ProcessKeys(KEY_Code_t Key, bool bKeyPressed, bool bKeyHeld) {
 
 void MSG_ClearPacketBuffer()
 { 
+    // Erases source
+    memset(dataPacket.ax25.source, 0, 7);
     // Erases destination
     memset(dataPacket.ax25.dest, 0, 7);
+    // Erases routes
+    memset(dataPacket.ax25.digis, 0, 56);
     // Erases message + FCS
 	memset(dataPacket.ax25.payload, 0, PAYLOAD_LENGTH + 2);
 }
 
 void MSG_Send(const char *cMessage){
 	MSG_ClearPacketBuffer();
-	#ifdef ENABLE_ENCRYPTION
-		if(gEeprom.MESSENGER_CONFIG.data.encrypt)
-		{
-			dataPacket.data.header=ENCRYPTED_MESSAGE_PACKET;
-		}
-		else
-		{
-			dataPacket.data.header=MESSAGE_PACKET;
-		}
-	#else
-		dataPacket.data.header=MESSAGE_PACKET;
-	#endif
-	memcpy(dataPacket.data.payload, cMessage, sizeof(dataPacket.data.payload));
+
+    memcpy(dataPacket.ax25.source, gEeprom.MESSENGER_CONFIG.callsign, 7);
+
+    // Find position of ':'
+    char *colon_pos = strchr(cMessage, ':');
+    int j = 0;  // Index for result array
+
+    if (colon_pos != NULL) {
+        // Loop through characters before ':'
+        for (int i = 0; cMessage + i < colon_pos; i++) {
+            if (cMessage[i] != '-' && cMessage[i] != ' ') { // Exclude '-' and ' '
+                dataPacket.ax25.dest[j++] = cMessage[i];  // Copy valid characters
+            }
+        }
+    }
+
+	memcpy(dataPacket.ax25.payload, cMessage, sizeof(dataPacket.ax25.payload));
+
 	MSG_SendPacket();
 }
 
@@ -669,7 +665,7 @@ void MSG_ConfigureFSK(bool rx)
 		(96u <<  0));    // 96
 
 	// Tone2 = FSK baudrate                       // kamilsss655 2024
-	switch(gEeprom.MESSENGER_CONFIG.data.modulation)
+	switch(gEeprom.MESSENGER_CONFIG.config_byte.data.modulation)
 	{
 		case MOD_AFSK_1200:
 			TONE2_FREQ = 12389u;
@@ -684,7 +680,7 @@ void MSG_ConfigureFSK(bool rx)
 
 	BK4819_WriteRegister(BK4819_REG_72, TONE2_FREQ);
 	
-	switch(gEeprom.MESSENGER_CONFIG.data.modulation)
+	switch(gEeprom.MESSENGER_CONFIG.config_byte.data.modulation)
 	{
 		case MOD_FSK_700:
 		case MOD_FSK_450:
