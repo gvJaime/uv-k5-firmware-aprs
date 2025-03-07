@@ -125,6 +125,12 @@ const t_menu_item MenuList[] =
 	{"MsgRx",  VOICE_ID_INVALID,                       MENU_MSG_RX        }, // messenger rx
 	{"MsgAck", VOICE_ID_INVALID,                       MENU_MSG_ACK       }, // messenger respond ACK
 	{"MsgMod", VOICE_ID_INVALID,                       MENU_MSG_MODULATION}, // messenger modulation
+#ifdef ENABLE_APRS
+	{"CallSg", VOICE_ID_INVALID,                       MENU_APRS_CALLSIGN  }, // APRS callsign
+	{"SSID"  , VOICE_ID_INVALID,                       MENU_APRS_SSID      }, // APRS SSID
+	{"Path1" , VOICE_ID_INVALID,                       MENU_APRS_PATH1     }, // APRS path 1
+	{"Path2" , VOICE_ID_INVALID,                       MENU_APRS_PATH2     }, // APRS path 2
+#endif
 #endif
 	{"Sql",    VOICE_ID_SQUELCH,                       MENU_SQL           },
 	// hidden menu items from here on
@@ -784,6 +790,115 @@ void UI_DisplayMenu(void)
 				case MENU_MSG_MODULATION:
 					strcpy(String, gSubMenu_MSG_MODULATION[gSubMenuSelection]);
 					break;
+
+			#endif
+
+			#ifdef ENABLE_APRS
+				case MENU_APRS_CALLSIGN:
+				{
+					if (!gIsInSubMenu)
+					{	// show placeholder in main menu
+						strcpy(String, "****");
+						UI_PrintString(String, menu_item_x1, menu_item_x2, 2, 8);
+					}
+					else
+					{	// show the callsign being edited
+						if (edit_index != -1 || gAskForConfirmation) {
+							UI_PrintString(edit, (menu_item_x1 -2), 0, 2, 8);
+							// show the cursor
+							if(edit_index < 6)
+								UI_PrintString(     "^", (menu_item_x1 -2) + (8 * edit_index), 0, 4, 8);  
+						}
+						else{
+							memset(String, 0, sizeof(String));
+							strcpy(String, gEeprom.APRS_CONFIG.callsign);
+							
+							UI_PrintString(String, (menu_item_x1 -2), 0, 2, 8);
+						}			
+					}
+
+					already_printed = true;
+					break;
+				}
+				case MENU_APRS_PATH1:
+				{
+					if (!gIsInSubMenu)
+					{	// show placeholder in main menu
+						strcpy(String, "****");
+						UI_PrintString(String, menu_item_x1, menu_item_x2, 2, 8);
+					}
+					else
+					{	// show the path being edited
+						if (edit_index != -1 || gAskForConfirmation) {
+							UI_PrintString(edit, (menu_item_x1 -2), 0, 2, 8);
+							// show the cursor
+							if(edit_index < 7)
+								UI_PrintString(     "^", (menu_item_x1 -2) + (8 * edit_index), 0, 4, 8);  
+						}
+						else{
+							memset(String, 0, sizeof(String));
+							strcpy(String, gEeprom.APRS_CONFIG.path1);
+							
+							UI_PrintString(String, (menu_item_x1 -2), 0, 2, 8);
+						}			
+					}
+
+					already_printed = true;
+					break;
+				}
+				case MENU_APRS_PATH2:
+				{
+					if (!gIsInSubMenu)
+					{	// show placeholder in main menu
+						strcpy(String, "****");
+						UI_PrintString(String, menu_item_x1, menu_item_x2, 2, 8);
+					}
+					else
+					{	// show the path being edited
+						if (edit_index != -1 || gAskForConfirmation) {
+							UI_PrintString(edit, (menu_item_x1 -2), 0, 2, 8);
+							// show the cursor
+							if(edit_index < 7)
+								UI_PrintString(     "^", (menu_item_x1 -2) + (8 * edit_index), 0, 4, 8);  
+						}
+						else{
+							memset(String, 0, sizeof(String));
+							strcpy(String, gEeprom.APRS_CONFIG.path2);
+							
+							UI_PrintString(String, (menu_item_x1 -2), 0, 2, 8);
+						}			
+					}
+					already_printed = true;
+					break;
+				}
+				case MENU_APRS_SSID:
+				{
+					if (!gIsInSubMenu)
+					{	// show placeholder in main menu
+						strcpy(String, "****");
+						UI_PrintString(String, menu_item_x1, menu_item_x2, 2, 8);
+					}
+					else
+					{	// show the ssid being edited
+						if (edit_index != -1 || gAskForConfirmation) {
+							UI_PrintString(edit, (menu_item_x1 -2), 0, 2, 8);
+							// show the cursor
+							if(edit_index < 2)
+								UI_PrintString(     "^", (menu_item_x1 -2) + (8 * edit_index), 0, 4, 8);  
+						}
+						else{
+							memset(String, 0, sizeof(String));
+							sprintf(String, "%d", gEeprom.APRS_CONFIG.ssid);
+							
+							UI_PrintString(String, (menu_item_x1 -2), 0, 2, 8);
+						}			
+					}
+
+					already_printed = true;
+					break;
+				}
+
+
 			#endif
 
 			case MENU_SAVE:
@@ -1016,6 +1131,13 @@ void UI_DisplayMenu(void)
 	     UI_MENU_GetCurrentMenuId() == MENU_MEM_CH   ||
 		 #ifdef ENABLE_ENCRYPTION
 			UI_MENU_GetCurrentMenuId() == MENU_ENC_KEY  ||
+		 #endif
+		 #ifdef ENABLE_APRS
+		 	UI_MENU_GetCurrentMenuId() == MENU_APRS_CALLSIGN  ||
+		 	UI_MENU_GetCurrentMenuId() == MENU_APRS_SSID      ||
+		 	UI_MENU_GetCurrentMenuId() == MENU_APRS_PATH1     ||
+		 	UI_MENU_GetCurrentMenuId() == MENU_APRS_PATH2     ||
+			
 		 #endif
 	     UI_MENU_GetCurrentMenuId() == MENU_MEM_NAME ||
 	     UI_MENU_GetCurrentMenuId() == MENU_DEL_CH) && gAskForConfirmation)

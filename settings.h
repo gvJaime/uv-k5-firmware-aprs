@@ -31,6 +31,10 @@
 	#include "app/messenger.h"
 #endif
 
+#ifdef ENABLE_APRS
+	#include "app/aprs.h"
+#endif
+
 enum POWER_OnDisplayMode_t {
 	POWER_ON_DISPLAY_MODE_FULL_SCREEN = 0,
 	POWER_ON_DISPLAY_MODE_MESSAGE,
@@ -253,6 +257,9 @@ typedef struct {
 #ifdef ENABLE_MESSENGER
 	MessengerConfig       MESSENGER_CONFIG;
 #endif
+#ifdef ENABLE_APRS
+	APRSConfig            APRS_CONFIG;
+#endif
 	uint16_t              VOX1_THRESHOLD;
 	uint16_t              VOX0_THRESHOLD;
 
@@ -288,5 +295,10 @@ void SETTINGS_UpdateChannel(uint8_t channel, const VFO_Info_t *pVFO, bool keep);
 void SETTINGS_SetVfoFrequency(uint32_t frequency);
 #ifdef ENABLE_ENCRYPTION
 	void SETTINGS_SaveEncryptionKey();
+#endif
+#ifdef ENABLE_APRS
+	void SETTINGS_SaveCallsignAndSSID();
+	void SETTINGS_SavePath_1();
+	void SETTINGS_SavePath_2();
 #endif
 #endif

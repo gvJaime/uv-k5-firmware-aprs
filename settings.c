@@ -192,6 +192,12 @@ void SETTINGS_SaveSettings(void)
 	#ifdef ENABLE_ENCRYPTION
 		SETTINGS_SaveEncryptionKey();
 	#endif
+
+	#ifdef ENABLE_APRS
+		SETTINGS_SaveCallsignAndSSID();
+		SETTINGS_SavePath_1();
+		SETTINGS_SavePath_2();
+	#endif
 }
 
 void SETTINGS_SaveChannel(uint8_t Channel, uint8_t VFO, const VFO_Info_t *pVFO, uint8_t Mode)
@@ -286,6 +292,39 @@ void SETTINGS_SaveEncryptionKey()
 	EEPROM_WriteBuffer(0x0F30, gEeprom.ENC_KEY, true);
 	EEPROM_WriteBuffer(0x0F38, gEeprom.ENC_KEY + 8, true);
 	gRecalculateEncKey = true;
+}
+#endif
+
+#ifdef ENABLE_APRS
+// 0x0F18..0x0F30
+void SETTINGS_SaveCallsignAndSSID() {
+	uint8_t buf[8];
+	
+	memset(buf, 0xFF, sizeof(buf));
+	memcpy(buf, gEeprom.APRS_CONFIG.callsign, 6);
+	// leaves a byte between the two
+	memcpy(buf + 6, &gEeprom.APRS_CONFIG.ssid, 1);
+
+	EEPROM_WriteBuffer(0x0F18, buf, true);
+}
+
+void SETTINGS_SavePath_1() {
+	uint8_t buf[8];
+	
+	memset(buf, 0xFF, sizeof(buf));
+	memcpy(buf, gEeprom.APRS_CONFIG.path1, 7);
+
+	EEPROM_WriteBuffer(0x0F20, buf, true);
+}
+
+
+void SETTINGS_SavePath_2() {
+	uint8_t buf[8];
+	
+	memset(buf, 0xFF, sizeof(buf));
+	memcpy(buf, gEeprom.APRS_CONFIG.path2, 7);
+
+	EEPROM_WriteBuffer(0x0F28, buf, true);
 }
 #endif
 

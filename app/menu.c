@@ -18,7 +18,9 @@
  */
 
 #include <string.h>
-
+#ifdef ENABLE_APRS
+	#include <stdlib.h>
+#endif
 #if !defined(ENABLE_OVERLAY)
 	#include "ARMCM0.h"
 #endif
@@ -507,6 +509,33 @@ void MENU_AcceptSetting(void)
 
 			case MENU_MSG_ENC:
 				gEeprom.MESSENGER_CONFIG.data.encrypt = gSubMenuSelection;
+				break;
+		#endif
+
+		#ifdef ENABLE_APRS
+			case MENU_APRS_CALLSIGN:
+				memset(gEeprom.APRS_CONFIG.callsign, 0, sizeof(gEeprom.APRS_CONFIG.callsign));
+				strcpy(gEeprom.APRS_CONFIG.callsign, edit);
+				memset(edit, 0, sizeof(edit));
+				gUpdateStatus = true;
+				break;
+			case MENU_APRS_SSID:
+				uint8_t ssid = atoi(edit) & 0x0F;
+				gEeprom.APRS_CONFIG.ssid = ssid;
+				memset(edit, 0, sizeof(edit));
+				gUpdateStatus = true;
+				break;
+			case MENU_APRS_PATH1:
+				memset(gEeprom.APRS_CONFIG.path1, 0, sizeof(gEeprom.APRS_CONFIG.path1));
+				strcpy(gEeprom.APRS_CONFIG.path1, edit);
+				memset(edit, 0, sizeof(edit));
+				gUpdateStatus = true;
+				break;
+			case MENU_APRS_PATH2:
+				memset(gEeprom.APRS_CONFIG.path2, 0, sizeof(gEeprom.APRS_CONFIG.path2));
+				strcpy(gEeprom.APRS_CONFIG.path2, edit);
+				memset(edit, 0, sizeof(edit));
+				gUpdateStatus = true;
 				break;
 		#endif
 
@@ -1239,6 +1268,11 @@ static void MENU_Key_0_to_9(KEY_Code_t Key, bool bKeyPressed, bool bKeyHeld)
 		#ifdef ENABLE_ENCRYPTION
 			|| UI_MENU_GetCurrentMenuId() == MENU_ENC_KEY
 		#endif
+		#ifdef ENABLE_APRS
+			|| UI_MENU_GetCurrentMenuId() == MENU_APRS_CALLSIGN
+			|| UI_MENU_GetCurrentMenuId() == MENU_APRS_PATH1
+			|| UI_MENU_GetCurrentMenuId() == MENU_APRS_PATH2
+		#endif
 	))
 		
 	{	// currently editing the channel name
@@ -1537,6 +1571,42 @@ static void MENU_Key_MENU(const bool bKeyPressed, const bool bKeyHeld)
 		}
 	#endif
 
+	#ifdef ENABLE_APRS
+		if (
+			UI_MENU_GetCurrentMenuId() == MENU_APRS_CALLSIGN
+			|| UI_MENU_GetCurrentMenuId() == MENU_APRS_PATH1
+			|| UI_MENU_GetCurrentMenuId() == MENU_APRS_PATH2
+			|| UI_MENU_GetCurrentMenuId() == MENU_APRS_SSID
+		)
+		{
+			uint8_t limit = 7;
+			if(UI_MENU_GetCurrentMenuId() == MENU_APRS_CALLSIGN) {
+				limit = 6; // Path callsigns have one more character
+			} else if (UI_MENU_GetCurrentMenuId() == MENU_APRS_SSID) {
+				limit = 2; // SSID will be 2 characters, strictly numeric
+			}
+			if (edit_index < 0)
+			{	// enter callsign edit mode
+				// pad the strings out with zeroes
+				edit_index = strlen(edit);
+				while (edit_index < limit)
+					edit[edit_index++] = 0;
+				edit[edit_index] = 0;
+				edit_index = 0;  // 'edit_index' is going to be used as the cursor position
+
+				return;
+			}
+			else if (edit_index >= 0 && edit_index < limit)
+			{	// editing the callsing characters
+
+				if (++edit_index < limit)
+					return;	// next char
+
+				// exit, save callsign
+			}
+		}
+	#endif
+
 	if (UI_MENU_GetCurrentMenuId() == MENU_MEM_NAME)
 	{
 		if (edit_index < 0)
@@ -1705,27 +1775,79 @@ static void MENU_Key_UP_DOWN(bool bKeyPressed, bool bKeyHeld, int8_t Direction)
 			#ifdef ENABLE_ENCRYPTION
 				|| UI_MENU_GetCurrentMenuId() == MENU_ENC_KEY
 			#endif
+			#ifdef ENABLE_APRS
+				|| UI_MENU_GetCurrentMenuId() == MENU_APRS_CALLSIGN
+				|| UI_MENU_GetCurrentMenuId() == MENU_APRS_SSID
+				|| UI_MENU_GetCurrentMenuId() == MENU_APRS_PATH1
+				|| UI_MENU_GetCurrentMenuId() == MENU_APRS_PATH2
+			#endif
 		)
 	)
-	{	// change the character
-		if (bKeyPressed && edit_index < 10 && Direction != 0)
-		{
-			// TODO: Allow special chars when setting encryption key
-			const char   unwanted[] = "$%&!\"':;?^`|{}";
-			char         c          = edit[edit_index] + Direction;
-			unsigned int i          = 0;
-			while (i < sizeof(unwanted) && c >= 32 && c <= 126)
-			{
-				if (c == unwanted[i++])
-				{	// choose next character
-					c += Direction;
-					i = 0;
+	{	
+		#ifdef ENABLE_APRS
+			if(UI_MENU_GetCurrentMenuId() == MENU_APRS_SSID) {
+				// change the number
+				if (bKeyPressed && edit_index < 2 && Direction != 0)
+				{
+					const char   unwanted[] = "$%&!\"':;?^`|{}";
+					char         c          = edit[edit_index] + Direction;
+					unsigned int i          = 0;
+					while (i < sizeof(unwanted) && c >= '0' && c <= '9')
+					{
+						if (c == unwanted[i++])
+						{	// choose next character
+							c += Direction;
+							i = 0;
+						}
+					}
+					edit[edit_index] = (c < '0') ? '9' : (c > '9') ? '0' : c;
+
+					gRequestDisplayScreen = DISPLAY_MENU;
+				}
+			} else {
+				// change the character
+				if (bKeyPressed && edit_index < 10 && Direction != 0)
+				{
+					// TODO: Allow special chars when setting encryption key
+					const char   unwanted[] = "$%&!\"':;?^`|{}";
+					char         c          = edit[edit_index] + Direction;
+					unsigned int i          = 0;
+					while (i < sizeof(unwanted) && c >= 32 && c <= 126)
+					{
+						if (c == unwanted[i++])
+						{	// choose next character
+							c += Direction;
+							i = 0;
+						}
+					}
+					edit[edit_index] = (c < 32) ? 126 : (c > 126) ? 32 : c;
+
+					gRequestDisplayScreen = DISPLAY_MENU;
 				}
 			}
-			edit[edit_index] = (c < 32) ? 126 : (c > 126) ? 32 : c;
+		#else // would be cleaner to not repeat this chunk of code, but changing control flow from macros seems even worse
+			// change the character
+			if (bKeyPressed && edit_index < 10 && Direction != 0)
+			{
+				// TODO: Allow special chars when setting encryption key
+				const char   unwanted[] = "$%&!\"':;?^`|{}";
+				char         c          = edit[edit_index] + Direction;
+				unsigned int i          = 0;
+				while (i < sizeof(unwanted) && c >= 32 && c <= 126)
+				{
+					if (c == unwanted[i++])
+					{	// choose next character
+						c += Direction;
+						i = 0;
+					}
+				}
+				edit[edit_index] = (c < 32) ? 126 : (c > 126) ? 32 : c;
 
-			gRequestDisplayScreen = DISPLAY_MENU;
-		}
+				gRequestDisplayScreen = DISPLAY_MENU;
+			}
+		#endif
+		
+		
 		return;
 	}
 
