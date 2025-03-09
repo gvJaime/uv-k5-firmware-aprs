@@ -301,9 +301,8 @@ void SETTINGS_SaveCallsignAndSSID() {
 	uint8_t buf[8];
 	
 	memset(buf, 0xFF, sizeof(buf));
-	memcpy(buf, gEeprom.APRS_CONFIG.callsign, 6);
-	// leaves a byte between the two
-	memcpy(buf + 6, &gEeprom.APRS_CONFIG.ssid, 1);
+	memcpy(buf, gEeprom.APRS_CONFIG.callsign, CALLSIGN_SIZE);
+	memcpy(buf + CALLSIGN_SIZE, &gEeprom.APRS_CONFIG.ssid, 1);
 
 	EEPROM_WriteBuffer(0x0F18, buf, true);
 }
@@ -312,7 +311,7 @@ void SETTINGS_SavePath_1() {
 	uint8_t buf[8];
 	
 	memset(buf, 0xFF, sizeof(buf));
-	memcpy(buf, gEeprom.APRS_CONFIG.path1, 7);
+	memcpy(buf, gEeprom.APRS_CONFIG.path1, PATH_SIZE);
 
 	EEPROM_WriteBuffer(0x0F20, buf, true);
 }
@@ -322,7 +321,7 @@ void SETTINGS_SavePath_2() {
 	uint8_t buf[8];
 	
 	memset(buf, 0xFF, sizeof(buf));
-	memcpy(buf, gEeprom.APRS_CONFIG.path2, 7);
+	memcpy(buf, gEeprom.APRS_CONFIG.path2, PATH_SIZE);
 
 	EEPROM_WriteBuffer(0x0F28, buf, true);
 }

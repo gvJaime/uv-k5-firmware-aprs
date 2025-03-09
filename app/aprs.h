@@ -11,10 +11,10 @@
 #define CALLSIGN_SIZE 6
 
 typedef struct {
-    char callsign[CALLSIGN_SIZE + 1];
+    char callsign[CALLSIGN_SIZE];
     uint8_t ssid;
-    char path1[PATH_SIZE + 1];
-    char path2[PATH_SIZE + 1];
+    char path1[PATH_SIZE];
+    char path2[PATH_SIZE];
 } APRSConfig;
 #endif
 

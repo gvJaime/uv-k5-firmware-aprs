@@ -514,8 +514,8 @@ void MENU_AcceptSetting(void)
 
 		#ifdef ENABLE_APRS
 			case MENU_APRS_CALLSIGN:
-				memset(gEeprom.APRS_CONFIG.callsign, 0, sizeof(gEeprom.APRS_CONFIG.callsign));
-				strcpy(gEeprom.APRS_CONFIG.callsign, edit);
+				memset(gEeprom.APRS_CONFIG.callsign, 0, CALLSIGN_SIZE);
+				strncpy(gEeprom.APRS_CONFIG.callsign, edit, CALLSIGN_SIZE);
 				memset(edit, 0, sizeof(edit));
 				gUpdateStatus = true;
 				break;
@@ -526,14 +526,14 @@ void MENU_AcceptSetting(void)
 				gUpdateStatus = true;
 				break;
 			case MENU_APRS_PATH1:
-				memset(gEeprom.APRS_CONFIG.path1, 0, sizeof(gEeprom.APRS_CONFIG.path1));
-				strcpy(gEeprom.APRS_CONFIG.path1, edit);
+				memset(gEeprom.APRS_CONFIG.path1, 0, PATH_SIZE);
+				strncpy(gEeprom.APRS_CONFIG.path1, edit, PATH_SIZE);
 				memset(edit, 0, sizeof(edit));
 				gUpdateStatus = true;
 				break;
 			case MENU_APRS_PATH2:
-				memset(gEeprom.APRS_CONFIG.path2, 0, sizeof(gEeprom.APRS_CONFIG.path2));
-				strcpy(gEeprom.APRS_CONFIG.path2, edit);
+				memset(gEeprom.APRS_CONFIG.path2, 0, PATH_SIZE);
+				strncpy(gEeprom.APRS_CONFIG.path2, edit, PATH_SIZE);
 				memset(edit, 0, sizeof(edit));
 				gUpdateStatus = true;
 				break;
@@ -1579,9 +1579,9 @@ static void MENU_Key_MENU(const bool bKeyPressed, const bool bKeyHeld)
 			|| UI_MENU_GetCurrentMenuId() == MENU_APRS_SSID
 		)
 		{
-			uint8_t limit = 7;
+			uint8_t limit = PATH_SIZE;
 			if(UI_MENU_GetCurrentMenuId() == MENU_APRS_CALLSIGN) {
-				limit = 6; // Path callsigns have one more character
+				limit = CALLSIGN_SIZE; // Path callsigns have one more character
 			} else if (UI_MENU_GetCurrentMenuId() == MENU_APRS_SSID) {
 				limit = 2; // SSID will be 2 characters, strictly numeric
 			}
@@ -1804,15 +1804,14 @@ static void MENU_Key_UP_DOWN(bool bKeyPressed, bool bKeyHeld, int8_t Direction)
 
 					gRequestDisplayScreen = DISPLAY_MENU;
 				}
-			} else {
+			} else if (UI_MENU_GetCurrentMenuId() == MENU_APRS_CALLSIGN) {
 				// change the character
-				if (bKeyPressed && edit_index < 10 && Direction != 0)
+				if (bKeyPressed && edit_index < CALLSIGN_SIZE && Direction != 0)
 				{
-					// TODO: Allow special chars when setting encryption key
-					const char   unwanted[] = "$%&!\"':;?^`|{}";
+					const char   unwanted[] = "./:;<=>?@";
 					char         c          = edit[edit_index] + Direction;
 					unsigned int i          = 0;
-					while (i < sizeof(unwanted) && c >= 32 && c <= 126)
+					while (i < sizeof(unwanted) && c >= '0' && c <= 'Z')
 					{
 						if (c == unwanted[i++])
 						{	// choose next character
@@ -1820,7 +1819,26 @@ static void MENU_Key_UP_DOWN(bool bKeyPressed, bool bKeyHeld, int8_t Direction)
 							i = 0;
 						}
 					}
-					edit[edit_index] = (c < 32) ? 126 : (c > 126) ? 32 : c;
+					edit[edit_index] = (c < '0') ? 'Z' : (c > 'Z') ? '0' : c;
+
+					gRequestDisplayScreen = DISPLAY_MENU;
+				}
+			} else {
+				// then it's path
+				if (bKeyPressed && edit_index < PATH_SIZE && Direction != 0)
+				{
+					const char   unwanted[] = "./:;<=>?@";
+					char         c          = edit[edit_index] + Direction;
+					unsigned int i          = 0;
+					while (i < sizeof(unwanted) && c >= '-' && c <= 'Z')
+					{
+						if (c == unwanted[i++])
+						{	// choose next character
+							c += Direction;
+							i = 0;
+						}
+					}
+					edit[edit_index] = (c < '-') ? 'Z' : (c > 'Z') ? '-' : c;
 
 					gRequestDisplayScreen = DISPLAY_MENU;
 				}

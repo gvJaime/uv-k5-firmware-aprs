@@ -737,6 +737,25 @@ void BOARD_EEPROM_Init(void)
 		EEPROM_ReadBuffer(0x0F30, gEeprom.ENC_KEY, sizeof(gEeprom.ENC_KEY));
 	#endif
 
+	#ifdef ENABLE_APRS
+		// 0x0F18..0x0F30 load Callsign, SSID, Path1 and Path2
+		EEPROM_ReadBuffer(
+			0x0F18,
+			gEeprom.APRS_CONFIG.callsign,
+			CALLSIGN_SIZE + sizeof(uint8_t)
+		);
+		EEPROM_ReadBuffer(
+			0x0F20,
+			gEeprom.APRS_CONFIG.path1,
+			PATH_SIZE
+		);
+		EEPROM_ReadBuffer(
+			0x0F28,
+			gEeprom.APRS_CONFIG.path2,
+			PATH_SIZE
+		);
+	#endif
+
 	#ifdef ENABLE_SPECTRUM_SHOW_CHANNEL_NAME
 		BOARD_gMR_LoadChannels();
 	#endif

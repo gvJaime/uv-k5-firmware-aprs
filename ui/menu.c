@@ -798,7 +798,8 @@ void UI_DisplayMenu(void)
 				{
 					if (!gIsInSubMenu)
 					{	// show placeholder in main menu
-						strcpy(String, "****");
+						strncpy(String, gEeprom.APRS_CONFIG.callsign, CALLSIGN_SIZE);
+						memset(String + CALLSIGN_SIZE, 0, 1);
 						UI_PrintString(String, menu_item_x1, menu_item_x2, 2, 8);
 					}
 					else
@@ -811,7 +812,7 @@ void UI_DisplayMenu(void)
 						}
 						else{
 							memset(String, 0, sizeof(String));
-							strcpy(String, gEeprom.APRS_CONFIG.callsign);
+							strncpy(String, gEeprom.APRS_CONFIG.callsign, CALLSIGN_SIZE);
 							
 							UI_PrintString(String, (menu_item_x1 -2), 0, 2, 8);
 						}			
@@ -824,7 +825,8 @@ void UI_DisplayMenu(void)
 				{
 					if (!gIsInSubMenu)
 					{	// show placeholder in main menu
-						strcpy(String, "****");
+						strncpy(String, gEeprom.APRS_CONFIG.path1, PATH_SIZE);
+						memset(String + PATH_SIZE, 0, 1);
 						UI_PrintString(String, menu_item_x1, menu_item_x2, 2, 8);
 					}
 					else
@@ -837,7 +839,7 @@ void UI_DisplayMenu(void)
 						}
 						else{
 							memset(String, 0, sizeof(String));
-							strcpy(String, gEeprom.APRS_CONFIG.path1);
+							strncpy(String, gEeprom.APRS_CONFIG.path1, PATH_SIZE);
 							
 							UI_PrintString(String, (menu_item_x1 -2), 0, 2, 8);
 						}			
@@ -850,7 +852,8 @@ void UI_DisplayMenu(void)
 				{
 					if (!gIsInSubMenu)
 					{	// show placeholder in main menu
-						strcpy(String, "****");
+						strncpy(String, gEeprom.APRS_CONFIG.path2, PATH_SIZE);
+						memset(String + PATH_SIZE, 0, 1);
 						UI_PrintString(String, menu_item_x1, menu_item_x2, 2, 8);
 					}
 					else
@@ -863,7 +866,7 @@ void UI_DisplayMenu(void)
 						}
 						else{
 							memset(String, 0, sizeof(String));
-							strcpy(String, gEeprom.APRS_CONFIG.path2);
+							strncpy(String, gEeprom.APRS_CONFIG.path2, PATH_SIZE);
 							
 							UI_PrintString(String, (menu_item_x1 -2), 0, 2, 8);
 						}			
@@ -875,7 +878,7 @@ void UI_DisplayMenu(void)
 				{
 					if (!gIsInSubMenu)
 					{	// show placeholder in main menu
-						strcpy(String, "****");
+						sprintf(String, "%d", gEeprom.APRS_CONFIG.ssid);
 						UI_PrintString(String, menu_item_x1, menu_item_x2, 2, 8);
 					}
 					else
