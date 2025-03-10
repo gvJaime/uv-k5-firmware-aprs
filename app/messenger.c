@@ -395,7 +395,6 @@ void MSG_HandleReceive() {
 	#else
 		if (dataPacket.data.header >= INVALID_PACKET) {
 	#endif
-
 		snprintf(rxMessage[3], PAYLOAD_LENGTH + 2, "ERROR: INVALID PACKET.");
 	} else {
 		moveUP(rxMessage);
@@ -428,7 +427,23 @@ void MSG_HandleReceive() {
 				}
 				snprintf(rxMessage[3], PAYLOAD_LENGTH + 2, "< %s", dataPacket.data.payload);
 			#else
-				snprintf(rxMessage[3], PAYLOAD_LENGTH + 2, "< %s", dataPacket.data.payload);
+				#ifdef ENABLE_APRS
+					// dump the message onto the display
+					snprintf(rxMessage[3], SRC_SIZE - 1, "%s", ax25frame.buffer + 1 + DEST_SIZE);
+					snprintf(
+						rxMessage[3] + sizeof(rxMessage[3]), // copy exactly after the source
+						3, // enough to fit a 0 to 15 number and a hyphen
+						"-%d",
+						ax25frame.buffer[1 + DEST_SIZE + SRC_SIZE - 1] && 0xFF // get the last byte of the src
+					);
+					snprintf(
+						rxMessage[3] + sizeof(rxMessage[3]), // copy exactly after the destination
+						ax25frame.fcs_offset - ax25frame.control_offset, // the length is the number of bytes between the control flag and the fcs minus one.
+						":%s", // but that minus one is not stated, because we need that "one" for the starting colons.
+					)
+				#else
+					snprintf(rxMessage[3], PAYLOAD_LENGTH + 2, "< %s", dataPacket.data.payload);
+				#endif
 			#endif
 			#ifdef ENABLE_MESSENGER_UART
 				UART_printf("SMS<%s\r\n", dataPacket.data.payload);
