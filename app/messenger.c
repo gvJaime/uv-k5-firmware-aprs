@@ -133,9 +133,15 @@ void MSG_FSKSendData() {
 	SYSTEM_DelayMs(100);
 
 	{	// load the entire packet data into the TX FIFO buffer
+		#ifdef ENABLE_APRS
+		for (size_t i = 0, j = 0; i < sizeof(ax25frame.buffer); i += 2, j++) {
+        	BK4819_WriteRegister(BK4819_REG_5F, (ax25frame.buffer[i + 1] << 8) | ax25frame.buffer[i]);
+    	}
+		#else
 		for (size_t i = 0, j = 0; i < sizeof(dataPacket.serializedArray); i += 2, j++) {
         	BK4819_WriteRegister(BK4819_REG_5F, (dataPacket.serializedArray[i + 1] << 8) | dataPacket.serializedArray[i]);
     	}
+		#endif
 	}
 
 	// enable FSK TX
@@ -212,8 +218,11 @@ void MSG_SendPacket() {
 		return;
 	} 
 
-	if ( strlen((char *)dataPacket.data.payload) > 0) {
-
+	#ifdef ENABLE_APRS
+		if ( strlen((char *)ax25frame.buffer) > 0) { // in the aprs implementation this function is expected to be called after checks
+	#else
+		if ( strlen((char *)dataPacket.data.payload) > 0) {
+	#endif
 		msgStatus = SENDING;
 
 		RADIO_SetVfoState(VFO_STATE_NORMAL);
@@ -221,11 +230,27 @@ void MSG_SendPacket() {
 		BK4819_ToggleGpioOut(BK4819_GPIO5_PIN1_RED, true);
 
 		// display sent message (before encryption)
+		#ifdef ENABLE_APRS
+		if(!is_ack(ax25frame)) {
+		#else
 		if (dataPacket.data.header != ACK_PACKET) {
+		#endif
 			moveUP(rxMessage);
-			sprintf(rxMessage[3], "> %s", dataPacket.data.payload);
+			#ifdef ENABLE_APRS
+				MSG_DisplayMessage(rxMessage[3]);
+			#else
+				sprintf(rxMessage[3], "> %s", dataPacket.data.payload);
+			#endif
 			memset(lastcMessage, 0, sizeof(lastcMessage));
-			memcpy(lastcMessage, dataPacket.data.payload, PAYLOAD_LENGTH);
+			#ifdef ENABLE_APRS
+				strncpy(
+					lastcMessage,
+					ax25frame.buffer + ax25frame.control_offset + 2,
+					ax25frame.fcs_offset - ax25frame.control_offset - 1
+				);
+			#else
+				memcpy(lastcMessage, dataPacket.data.payload, PAYLOAD_LENGTH);
+			#endif
 			cIndex = 0;
 			prevKey = 0;
 			prevLetter = 0;
@@ -384,6 +409,23 @@ void MSG_SendAck() {
 	MSG_SendPacket();
 }
 
+void MSG_DisplayMessage(uint8_t * field) {
+	// dump the message onto the display
+	snprintf(rxMessage[3], SRC_SIZE - 1, "%s", ax25frame.buffer + 1 + DEST_SIZE);
+	snprintf(
+		rxMessage[3] + sizeof(rxMessage[3]), // copy exactly after the source
+		3, // enough to fit a 0 to 15 number and a hyphen
+		"-%d",
+		ax25frame.buffer[1 + DEST_SIZE + SRC_SIZE - 1] && 0xFF // get the last byte of the src
+	);
+	snprintf(
+		rxMessage[3] + sizeof(rxMessage[3]), // copy exactly after the destination
+		ax25frame.fcs_offset - ax25frame.control_offset, // the length is the number of bytes between the control flag and the fcs minus one.
+		":%s", // but that minus one is not stated, because we need that "one" for the starting colons.
+		ax25frame.buffer + ax25frame.control_offset + 1
+	)
+}
+
 void MSG_HandleReceive() {
 	#ifdef ENABLE_APRS
 		uint8_t valid = is_valid(ax25frame);
@@ -399,7 +441,7 @@ void MSG_HandleReceive() {
 	} else {
 		moveUP(rxMessage);
 		#ifdef ENABLE_APRS
-			if (is_ack(ax25frame, msg_id)) {
+			if (is_ack_for_message(ax25frame, msg_id)) {
 				send_ack = 1;
 		#else
 			if (dataPacket.data.header == ACK_PACKET) {
@@ -428,25 +470,24 @@ void MSG_HandleReceive() {
 				snprintf(rxMessage[3], PAYLOAD_LENGTH + 2, "< %s", dataPacket.data.payload);
 			#else
 				#ifdef ENABLE_APRS
-					// dump the message onto the display
-					snprintf(rxMessage[3], SRC_SIZE - 1, "%s", ax25frame.buffer + 1 + DEST_SIZE);
-					snprintf(
-						rxMessage[3] + sizeof(rxMessage[3]), // copy exactly after the source
-						3, // enough to fit a 0 to 15 number and a hyphen
-						"-%d",
-						ax25frame.buffer[1 + DEST_SIZE + SRC_SIZE - 1] && 0xFF // get the last byte of the src
-					);
-					snprintf(
-						rxMessage[3] + sizeof(rxMessage[3]), // copy exactly after the destination
-						ax25frame.fcs_offset - ax25frame.control_offset, // the length is the number of bytes between the control flag and the fcs minus one.
-						":%s", // but that minus one is not stated, because we need that "one" for the starting colons.
-					)
+					MSG_DisplayMessage(rxMessage[3]);
 				#else
 					snprintf(rxMessage[3], PAYLOAD_LENGTH + 2, "< %s", dataPacket.data.payload);
 				#endif
 			#endif
 			#ifdef ENABLE_MESSENGER_UART
+			#ifdef ENABLE_APRS
+				uint8_t buf[PAYLOAD_LENGTH + 8];
+				snprintf(
+					buf,
+					ax25frame.fcs_offset - ax25frame.control_offset,
+					"APRS<%s\r\n",
+					ax25frame.buffer + ax25frame.control_offset + 1
+				);
+				UART_Send(buf, sizeof(buf));
+			#else
 				UART_printf("SMS<%s\r\n", dataPacket.data.payload);
+			#endif
 			#endif
 		}
 
@@ -633,10 +674,13 @@ void MSG_Send(const char *cMessage){
 		{
 			dataPacket.data.header=MESSAGE_PACKET;
 		}
+	#endif
+	#ifdef ENABLE_APRS
+		prepare_message(frame, cMessage);
 	#else
 		dataPacket.data.header=MESSAGE_PACKET;
+		memcpy(dataPacket.data.payload, cMessage, sizeof(dataPacket.data.payload));
 	#endif
-	memcpy(dataPacket.data.payload, cMessage, sizeof(dataPacket.data.payload));
 	MSG_SendPacket();
 }
 
@@ -802,7 +846,11 @@ void MSG_ConfigureFSK(bool rx)
 
 	// packet size .. sync + packet - size of a single packet
 
-	uint16_t size = sizeof(dataPacket.serializedArray);
+	#ifdef ENABLE_APRS // this is possibly going to be too big.
+		uint16_t size = sizeof(ax25frame.buffer);
+	#else
+		uint16_t size = sizeof(dataPacket.serializedArray);
+	#endif
 	// size -= (fsk_reg59 & (1u << 3)) ? 4 : 2;
 	if(rx)
 		size = (((size + 1) / 2) * 2) + 2;             // round up to even, else FSK RX doesn't work

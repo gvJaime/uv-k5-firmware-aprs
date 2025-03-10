@@ -61,8 +61,9 @@ typedef struct {
 
 extern uint16_t msg_id;
 
-uint16_t ax25_compute_fcs(const uint8_t *data, uint8_t len);
-uint8_t is_ack(struct AX25Frame frame, uint16_t for_message_id);
+uint16_t ax25_compute_fcs(const uint8_t *data, uint16_t len);
+uint8_t is_ack_for_message(struct AX25Frame frame, uint16_t for_message_id);
+uint8_t is_ack(struct AX25Frame frame);
 void ax25_set_fcs(struct AX25Frame *frame);
 uint8_t ax25_check_fcs(struct AX25Frame *frame);
 uint8_t is_valid(struct AX25Frame frame);

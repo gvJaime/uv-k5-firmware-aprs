@@ -53,12 +53,22 @@ uint8_t parse_offsets(struct AX25Frame frame) {
 }
 
 // we only compare the message id for now
-uint8_t is_ack(struct AX25Frame frame, uint16_t for_message_id) {
+uint8_t is_ack_for_message(struct AX25Frame frame, uint16_t for_message_id) {
     const uint16_t *p = frame.buffer + control_offset + 2;
     // Check that the payload starts with ':' and the fixed sequence ":ack" is at the correct offset.
     if (p[0] != ':' || memcmp(&p[10], ":ack", 4) != 0)
         return 0;
-    // Check that the message number (starting at index 14) is not empty.
+    // TODO: Check the message id
+    
+    return 1;
+}
+
+// we only compare the message id for now
+uint8_t is_ack(struct AX25Frame frame) {
+    const uint16_t *p = frame.buffer + control_offset + 2;
+    // Check that the payload starts with ':' and the fixed sequence ":ack" is at the correct offset.
+    if (p[0] != ':' || memcmp(&p[10], ":ack", 4) != 0)
+        return 0;
     
     return 1;
 }
