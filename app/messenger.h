@@ -29,7 +29,11 @@
 
 enum {
 	NONCE_LENGTH = 13,
-	PAYLOAD_LENGTH = 30
+  #ifdef ENABLE_APRS
+	  PAYLOAD_LENGTH = 256
+  #else
+    PAYLOAD_LENGTH = 30
+  #endif
 };
 
 typedef enum KeyboardType {

@@ -1,11 +1,11 @@
 
 
 #ifndef APRS_H
-#define APRS
-
-#include <stdint.h>
+#define APRS_H
 
 #ifdef ENABLE_APRS
+
+#include <stdint.h>
 
 #define PATH_SIZE 7
 #define CALLSIGN_SIZE 6
@@ -16,6 +16,51 @@ typedef struct {
     char path1[PATH_SIZE];
     char path2[PATH_SIZE];
 } APRSConfig;
+
+#define DEST_SIZE 7
+#define SRC_SIZE 7
+#define DIGI_MAX_SIZE 56
+#define INFO_MAX_SIZE 256
+
+extern const aprs_destination = "APN000";
+
+#define AX25_FLAG            0x7E
+#define AX25_CONTROL_UI      0x03
+#define AX25_PID_NO_LAYER3   0xF0
+#define AX25_FCS_POLY        0x8408  // Reversed polynomial for CRC-16-CCITT
+
+#define BUFFER_SIZE 1 + DEST_SIZE + SRC_SIZE + DIGI_MAX_SIZE + 1 + 1 + INFO_MAX_SIZE + 2 + 1
+
+// you are supposed to lay out the data onto the buffer as it is received,
+// parse the buffer and find the offsets of the variable sections,
+// namely the digis section and the info section.
+// if all AX25 packets were the same length, it would have this structure:
+//typedef struct {
+//    uint8_t start_flag; // for alignment purposes
+//    uint8_t dest[7];     // Destination callsign field (7 bytes)
+//    uint8_t source[7];   // Source callsign field (7 bytes)
+//    uint8_t digis[56];   // digipeater callsigns
+//    uint8_t control;     // Control field (UI frame)
+//    uint8_t pid;         // PID field (No layer 3)
+//    uint8_t payload[PAYLOAD_LENGTH]; // APRS text payload
+//    uint16_t fcs;        // Frame Check Sequence (CRC)
+//    uint8_t end_flag; // for alignment purposes
+//  } AX25Frame;
+typedef struct {
+    struct {
+        uint8_t control_offset;
+        uint16_t fcs_offset;
+    }
+    uint16_t buffer [BUFFER_SIZE];
+} AX25Frame;
+
+uint16_t ax25_compute_fcs(const uint8_t *data, uint8_t len);
+uint8_t is_ack(struct AX25Frame frame, uint16_t for_message);
+void ax25_set_fcs(struct AX25Frame *frame);
+uint8_t ax25_check_fcs(struct AX25Frame *frame);
+uint8_t is_valid(struct AX25Frame frame);
+
+
 #endif
 
 #endif
