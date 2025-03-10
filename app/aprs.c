@@ -6,8 +6,8 @@
 #include "settings.h"
 
 // possibly read from EEPROM in the future
-msg_id = 100;
-aprs_destination = "APN000" // apparently dependant on the device
+uint16_t msg_id = 100;
+const uint8_t * aprs_destination = "APN000"; // apparently dependant on the device
 
 uint16_t find_offset(const uint8_t *arr, uint16_t arr_length, uint8_t target, uint16_t start_offset) {
     for (uint16_t i = start_offset; i < arr_length; ++i) {
@@ -40,10 +40,10 @@ uint16_t APRS_compute_fcs(const uint8_t *data, uint16_t len) {
 }
 
 uint8_t APRS_is_valid(AX25Frame frame) {
-    const uint16_t *p = frame.buffer;
+    const uint8_t *p = frame.buffer;
     if(p[0] != 0x7E || p[strlen(p) - 1] != 0x7E)
         return false;
-    return APRS_check_fcs(frame);
+    return APRS_check_fcs(&frame);
 }
 
 uint8_t APRS_parse_offsets(AX25Frame frame) {
