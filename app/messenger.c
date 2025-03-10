@@ -231,7 +231,7 @@ void MSG_SendPacket() {
 
 		// display sent message (before encryption)
 		#ifdef ENABLE_APRS
-		if(!is_ack(ax25frame)) {
+		if(!APRS_is_ack(ax25frame)) {
 		#else
 		if (dataPacket.data.header != ACK_PACKET) {
 		#endif
@@ -397,7 +397,7 @@ void MSG_SendAck() {
 		uint8_t origin_callsign[DEST_SIZE + 1];
 		origin_callsign[DEST_SIZE] = 0;
 		MSG_ClearPacketBuffer();
-		prepare_ack(ax25frame, ack_id, origin_callsign);
+		APRS_prepare_ack(ax25frame, ack_id, origin_callsign);
 	#else
 		MSG_ClearPacketBuffer();
 		// in the future we might reply with received payload and then the sending radio
@@ -428,12 +428,12 @@ void MSG_DisplayMessage(char * field) {
 
 void MSG_HandleReceive() {
 	#ifdef ENABLE_APRS
-		uint8_t valid = is_valid(ax25frame);
+		uint8_t valid = APRS_is_valid(ax25frame);
 		if(valid) {
-			valid = parse_offsets(ax25frame);
+			valid = APRS_parse_offsets(ax25frame);
 		}
 		uint8_t send_ack = 0;
-		if(valid && destined_to_user(ax25frame)) {
+		if(valid && APRS_destined_to_user(ax25frame)) {
 	#else
 		if (dataPacket.data.header >= INVALID_PACKET) {
 	#endif
@@ -441,7 +441,7 @@ void MSG_HandleReceive() {
 	} else {
 		moveUP(rxMessage);
 		#ifdef ENABLE_APRS
-			if (is_ack_for_message(ax25frame, msg_id)) {
+			if (APRS_is_ack_for_message(ax25frame, msg_id)) {
 				send_ack = 1;
 		#else
 			if (dataPacket.data.header == ACK_PACKET) {
@@ -507,7 +507,7 @@ void MSG_HandleReceive() {
 	// Transmit a message to the sender that we have received the message
 	if(gEeprom.MESSENGER_CONFIG.data.ack) {
 		#ifdef ENABLE_APRS
-			uint16_t ack_id = get_msg_id(ax25frame);
+			uint16_t ack_id = APRS_get_msg_id(ax25frame);
 			if(send_ack && ack_id)
 		#else
 			if (dataPacket.data.header == MESSAGE_PACKET ||
@@ -676,7 +676,7 @@ void MSG_Send(const char *cMessage){
 		}
 	#endif
 	#ifdef ENABLE_APRS
-		prepare_message(ax25frame, cMessage);
+		APRS_prepare_message(ax25frame, cMessage);
 	#else
 		dataPacket.data.header=MESSAGE_PACKET;
 		memcpy(dataPacket.data.payload, cMessage, sizeof(dataPacket.data.payload));
