@@ -40,7 +40,7 @@
 #ifdef ENABLE_MESSENGER_UART
     #include "driver/uart.h"
 #endif
-#ifdef
+#ifdef ENABLE_APRS
 	#include "app/aprs.h"
 #endif
 
@@ -72,7 +72,7 @@ KeyboardType keyboardType = UPPERCASE;
 MsgStatus msgStatus = READY;
 
 #ifdef ENABLE_APRS
-	struct AX25Frame ax25_frame;
+	AX25Frame ax25frame;
 #else
 	union DataPacket dataPacket;
 #endif
@@ -243,7 +243,7 @@ void MSG_SendPacket() {
 			#endif
 			memset(lastcMessage, 0, sizeof(lastcMessage));
 			#ifdef ENABLE_APRS
-				strncpy(
+				memcpy(
 					lastcMessage,
 					ax25frame.buffer + ax25frame.control_offset + 2,
 					ax25frame.fcs_offset - ax25frame.control_offset - 1
@@ -409,21 +409,21 @@ void MSG_SendAck() {
 	MSG_SendPacket();
 }
 
-void MSG_DisplayMessage(uint8_t * field) {
+void MSG_DisplayMessage(char * field) {
 	// dump the message onto the display
-	snprintf(rxMessage[3], SRC_SIZE - 1, "%s", ax25frame.buffer + 1 + DEST_SIZE);
+	snprintf(field, SRC_SIZE - 1, "%s", ax25frame.buffer + 1 + DEST_SIZE);
 	snprintf(
-		rxMessage[3] + sizeof(rxMessage[3]), // copy exactly after the source
+		field + sizeof(field), // copy exactly after the source
 		3, // enough to fit a 0 to 15 number and a hyphen
 		"-%d",
 		ax25frame.buffer[1 + DEST_SIZE + SRC_SIZE - 1] && 0xFF // get the last byte of the src
 	);
 	snprintf(
-		rxMessage[3] + sizeof(rxMessage[3]), // copy exactly after the destination
+		field + sizeof(field), // copy exactly after the destination
 		ax25frame.fcs_offset - ax25frame.control_offset, // the length is the number of bytes between the control flag and the fcs minus one.
 		":%s", // but that minus one is not stated, because we need that "one" for the starting colons.
 		ax25frame.buffer + ax25frame.control_offset + 1
-	)
+	);
 }
 
 void MSG_HandleReceive() {
@@ -676,7 +676,7 @@ void MSG_Send(const char *cMessage){
 		}
 	#endif
 	#ifdef ENABLE_APRS
-		prepare_message(frame, cMessage);
+		prepare_message(ax25frame, cMessage);
 	#else
 		dataPacket.data.header=MESSAGE_PACKET;
 		memcpy(dataPacket.data.payload, cMessage, sizeof(dataPacket.data.payload));

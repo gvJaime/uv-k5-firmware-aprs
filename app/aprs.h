@@ -24,7 +24,7 @@ typedef struct {
 #define DIGI_MAX_SIZE DIGI_CALL_SIZE * MAX_DIGIS
 #define INFO_MAX_SIZE 256
 
-extern const aprs_destination;
+extern const uint8_t * aprs_destination;
 
 #define AX25_FLAG            0x7E
 #define AX25_CONTROL_UI      0x03
@@ -32,7 +32,7 @@ extern const aprs_destination;
 #define AX25_FCS_POLY        0x8408  // Reversed polynomial for CRC-16-CCITT
 #define APRS_ACK_TOKEN       '{'
 
-#define BUFFER_SIZE 1 + DEST_SIZE + SRC_SIZE + DIGI_MAX_SIZE + 1 + 1 + INFO_MAX_SIZE + 2 + 1
+#define APRS_BUFFER_SIZE 1 + DEST_SIZE + SRC_SIZE + DIGI_MAX_SIZE + 1 + 1 + INFO_MAX_SIZE + 2 + 1 + 1 // last one added because it needs to be even
 
 #define ADDRESSEE_SIZE 9
 
@@ -52,26 +52,24 @@ extern const aprs_destination;
 //    uint8_t end_flag; // for alignment purposes
 //  } AX25Frame;
 typedef struct {
-    struct {
-        uint8_t control_offset;
-        uint16_t fcs_offset;
-    }
-    uint16_t buffer [BUFFER_SIZE];
+    uint8_t control_offset;
+    uint16_t fcs_offset;
+    uint8_t buffer[APRS_BUFFER_SIZE];
 } AX25Frame;
 
 extern uint16_t msg_id;
 
 uint16_t ax25_compute_fcs(const uint8_t *data, uint16_t len);
-uint8_t is_ack_for_message(struct AX25Frame frame, uint16_t for_message_id);
-uint8_t is_ack(struct AX25Frame frame);
-void ax25_set_fcs(struct AX25Frame *frame);
-uint8_t ax25_check_fcs(struct AX25Frame *frame);
-uint8_t is_valid(struct AX25Frame frame);
-uint8_t destined_to_user(struct AX25Frame frame);
-uint16_t get_msg_id(struct AX25Frame frame);
-uint8_t parse_offsets(struct AX25Frame frame);
-void prepare_ack(struct AX25Frame frame, uint16_t for_message_id, uint8_t * for_callsign);
-void prepare_message(struct AX25Frame frame, uint8_t * message);
+uint8_t is_ack_for_message(AX25Frame frame, uint16_t for_message_id);
+uint8_t is_ack(AX25Frame frame);
+void ax25_set_fcs(AX25Frame *frame);
+uint8_t ax25_check_fcs(AX25Frame *frame);
+uint8_t is_valid(AX25Frame frame);
+uint8_t destined_to_user(AX25Frame frame);
+uint16_t get_msg_id(AX25Frame frame);
+uint8_t parse_offsets(AX25Frame frame);
+void prepare_ack(AX25Frame frame, uint16_t for_message_id, uint8_t * for_callsign);
+void prepare_message(AX25Frame frame, const char * message);
 
 
 #endif
