@@ -1,5 +1,13 @@
 #ifdef ENABLE_APRS
+#include <stdint.h>
+
 #include "app/messenger.h"
+
+#include "settings.h"
+
+// possibly read from EEPROM in the future
+msg_id = 100;
+aprs_destination = "APN000" // apparently dependant on the device
 
 uint16_t find_offset(const uint8_t *arr, uint16_t arr_length, uint8_t target, uint16_t start_offset) {
     for (uint16_t i = start_offset; i < arr_length; ++i) {
@@ -24,9 +32,9 @@ static uint16_t ax25_crc_update(uint16_t crc, uint8_t byte) {
 }
 
 // Computes the Frame Check Sequence (CRC-16) over the provided data.
-uint16_t ax25_compute_fcs(const uint8_t *data, uint8_t len) {
+uint16_t ax25_compute_fcs(const uint8_t *data, uint16_t len) {
     uint16_t crc = 0xFFFF;
-    for (uint8_t i = 0; i < len; i++)
+    for (uint16_t i = 0; i < len; i++)
         crc = ax25_crc_update(crc, data[i]);
     return ~crc;
 }
@@ -38,13 +46,14 @@ uint8_t is_valid(struct AX25Frame frame) {
     return ax25_check_fcs(frame);
 }
 
-void ax25_parse_offsets(struct AX25Frame frame) {
+uint8_t parse_offsets(struct AX25Frame frame) {
     frame.control_offset = find_offset(frame.buffer, BUFFER_SIZE, AX25_CONTROL_UI, 1 + DEST_SIZE + SRC_SIZE);
     frame.fcs_offset = find_offset(frame.buffer, BUFFER_SIZE, AX25_FLAG, frame.control_offset) - 2;
+    return frame.control_offset != -1 && frame.fcs_offset != -1;
 }
 
 // we only compare the message id for now
-uint8_t is_ack(struct AX25Frame frame, uint16_t for_message) {
+uint8_t is_ack(struct AX25Frame frame, uint16_t for_message_id) {
     const uint16_t *p = frame.buffer + control_offset + 2;
     // Check that the payload starts with ':' and the fixed sequence ":ack" is at the correct offset.
     if (p[0] != ':' || memcmp(&p[10], ":ack", 4) != 0)
@@ -66,6 +75,53 @@ uint8_t ax25_check_fcs(struct AX25Frame *frame) {
     uint16_t crc = ax25_compute_fcs(frame.buffer + 1, frame.fcs_offset - 1);
     uint16_t * fcs_ptr = frame.buffer + frame.fcs_offset;
     return *fcs_ptr == crc;
+}
+
+// we check if we are the intended recipient of the message
+uint8_t destined_to_user(struct AX25Frame frame) {
+    const uint16_t *p = frame.buffer + frame.control_offset + 3;
+    return memcmp(&p[0], gEeprom.APRS_CONFIG.callsign, CALLSIGN_SIZE);
+}
+
+uint16_t get_msg_id(struct AX25Frame frame) {
+    uint16_t offset = find_offset(frame.buffer, BUFFER_SIZE, APRS_ACK_TOKEN, frame.control_offset);
+    if(offset != -1) {
+        uint8_t* p = frame.buffer + offset;
+        // set end of buffer to zero to ensure atoi works well. We won't use this anymore anyway
+        memset(frame.buffer + frame.fcs_offset, 0, 3);
+        return atoi(p);
+    } else {
+        return 0;
+    }
+}
+
+#define ACK_SIZE 1 + ADDRESSEE_SIZE + 1 + 3 + 5 + 1
+
+void prepare_ack(struct AX25Frame frame, uint16_t for_message_id, uint8_t * for_callsign) {
+    uint8_t * message[ACK_SIZE];
+    memset(message, 0 , ACK_SIZE);
+    sprintf(message, ":%s:ack%d", for_callsign, for_message_id);
+    prepare_message(frame, message);
+}
+
+// TODO: Bit stuffing per section 3.6 of AX25 spec if needed
+void prepare_message(struct AX25Frame frame, uint8_t * message) {
+    frame.buffer[0] = AX25_FLAG;
+    memset(frame.buffer, 0, BUFFER_SIZE);
+    strncpy(frame.buffer + 1, aprs_destination, 7);
+    strncpy(frame.buffer + 1 + DEST_SIZE, gEeprom.APRS_CONFIG.callsign, SRC_SIZE - 1);
+    frame.buffer[1 + DEST_SIZE + SRC_SIZE - 1] = gEeprom.APRS_CONFIG.ssid;
+    strncpy(frame.buffer + 1 + DEST_SIZE + SRC_SIZE, gEeprom.APRS_CONFIG.path1, DIGI_CALL_SIZE);
+    strncpy(frame.buffer + 1 + DEST_SIZE + SRC_SIZE + DIGI_CALL_SIZE, gEeprom.APRS_CONFIG.path2, DIGI_CALL_SIZE);
+    frame.control_offset = 1 + DEST_SIZE + SRC_SIZE + DIGI_CALL_SIZE * 2;
+    frame.buffer[frame.control_offset] = AX25_CONTROL_UI;
+    frame.buffer[frame.control_offset + 1] = AX25_PID_NO_LAYER3;
+    snprintf(frame.buffer + frame.control_offset + 2, INFO_MAX_SIZE, ":%s", message);
+    frame.fcs_offset = sizeof(frame.buffer);
+    uint16_t fcs = ax25_compute_fcs(frame.buffer, frame.fcs_offset);
+    frame.buffer[frame.fcs_offset] = (fcs >> 8) & 0xFF;  // MSB first
+    frame.buffer[frame.fcs_offset + 1] = fcs & 0xFF;     // LSB
+    frame.buffer[frame.fcs_offset + 1] = AX25_FLAG;
 }
 
 #endif

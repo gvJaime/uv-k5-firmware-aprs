@@ -104,7 +104,11 @@ void MSG_ProcessKeys(KEY_Code_t Key, bool bKeyPressed, bool bKeyHeld);
 void MSG_SendPacket();
 void MSG_FSKSendData();
 void MSG_ClearPacketBuffer();
-void MSG_SendAck();
+#ifdef ENABLE_APRS
+  void MSG_SendAck(uint16_t ack_id);
+#else
+  void MSG_SendAck();
+#endif
 void MSG_HandleReceive();
 void MSG_Send(const char *cMessage);
 void MSG_ConfigureFSK(bool rx);

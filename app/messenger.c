@@ -40,6 +40,9 @@
 #ifdef ENABLE_MESSENGER_UART
     #include "driver/uart.h"
 #endif
+#ifdef
+	#include "app/aprs.h"
+#endif
 
 const uint8_t MSG_BUTTON_STATE_HELD = 1 << 1;
 
@@ -68,7 +71,11 @@ KeyboardType keyboardType = UPPERCASE;
 
 MsgStatus msgStatus = READY;
 
-union DataPacket dataPacket;
+#ifdef ENABLE_APRS
+	struct AX25Frame ax25_frame;
+#else
+	union DataPacket dataPacket;
+#endif
 
 uint16_t gErrorsDuringMSG;
 
@@ -309,10 +316,17 @@ void MSG_StorePacket(const uint16_t interrupt_bits) {
 		const uint16_t count = BK4819_ReadRegister(BK4819_REG_5E) & (7u << 0);  // almost full threshold
 		for (uint16_t i = 0; i < count; i++) {
 			const uint16_t word = BK4819_ReadRegister(BK4819_REG_5F);
-			if (gFSKWriteIndex < sizeof(dataPacket.serializedArray))
-				dataPacket.serializedArray[gFSKWriteIndex++] = (word >> 0) & 0xff;
-			if (gFSKWriteIndex < sizeof(dataPacket.serializedArray))
-				dataPacket.serializedArray[gFSKWriteIndex++] = (word >> 8) & 0xff;
+			#ifdef ENABLE_APRS
+				if (gFSKWriteIndex < sizeof(ax25frame.buffer))
+					ax25frame.buffer[gFSKWriteIndex++] = (word >> 0) & 0xff;
+				if (gFSKWriteIndex < sizeof(ax25frame.buffer))
+					ax25frame.buffer[gFSKWriteIndex++] = (word >> 8) & 0xff;
+			#else
+				if (gFSKWriteIndex < sizeof(dataPacket.serializedArray))
+					dataPacket.serializedArray[gFSKWriteIndex++] = (word >> 0) & 0xff;
+				if (gFSKWriteIndex < sizeof(dataPacket.serializedArray))
+					dataPacket.serializedArray[gFSKWriteIndex++] = (word >> 8) & 0xff;
+			#endif
 		}
 
 		SYSTEM_DelayMs(10);
@@ -347,34 +361,62 @@ void MSG_Init() {
 	#endif
 }
 
+#ifdef ENABLE_APRS
+void MSG_SendAck(uint16_t ack_id) {
+#else
 void MSG_SendAck() {
+#endif
 	// in the future we might reply with received payload and then the sending radio
 	// could compare it and determine if the messegage was read correctly (kamilsss655)
-	MSG_ClearPacketBuffer();
-	dataPacket.data.header = ACK_PACKET;
-	// sending only empty header seems to not work, so set few bytes of payload to increase reliability (kamilsss655)
-	memset(dataPacket.data.payload, 255, 5);
+	#ifdef ENABLE_APRS
+		uint8_t origin_callsign[DEST_SIZE + 1];
+		origin_callsign[DEST_SIZE] = 0;
+		MSG_ClearPacketBuffer();
+		prepare_ack(ax25frame, ack_id, origin_callsign);
+	#else
+		MSG_ClearPacketBuffer();
+		// in the future we might reply with received payload and then the sending radio
+		// could compare it and determine if the messegage was read correctly (kamilsss655)
+		dataPacket.data.header = ACK_PACKET;
+		// sending only empty header seems to not work, so set few bytes of payload to increase reliability (kamilsss655)
+		memset(dataPacket.data.payload, 255, 5);
+	#endif
 	MSG_SendPacket();
 }
 
-void MSG_HandleReceive(){
-	if (dataPacket.data.header == ACK_PACKET) {
-	#ifdef ENABLE_MESSENGER_DELIVERY_NOTIFICATION
-		#ifdef ENABLE_MESSENGER_UART
-			UART_printf("SVC<RCPT\r\n");
-		#endif
-		rxMessage[3][0] = '+';
-		gUpdateStatus = true;
-		gUpdateDisplay = true;
+void MSG_HandleReceive() {
+	#ifdef ENABLE_APRS
+		uint8_t valid = is_valid(ax25frame);
+		if(valid) {
+			valid = parse_offsets(ax25frame);
+		}
+		uint8_t send_ack = 0;
+		if(valid && destined_to_user(ax25frame)) {
+	#else
+		if (dataPacket.data.header >= INVALID_PACKET) {
 	#endif
+
+		snprintf(rxMessage[3], PAYLOAD_LENGTH + 2, "ERROR: INVALID PACKET.");
 	} else {
 		moveUP(rxMessage);
-		if (dataPacket.data.header >= INVALID_PACKET) {
-			snprintf(rxMessage[3], PAYLOAD_LENGTH + 2, "ERROR: INVALID PACKET.");
+		#ifdef ENABLE_APRS
+			if (is_ack(ax25frame, msg_id)) {
+				send_ack = 1;
+		#else
+			if (dataPacket.data.header == ACK_PACKET) {
+		#endif
+			#ifdef ENABLE_MESSENGER_DELIVERY_NOTIFICATION
+				#ifdef ENABLE_MESSENGER_UART
+					UART_printf("SVC<RCPT\r\n");
+				#endif
+				rxMessage[3][0] = '+';
+				gUpdateStatus = true;
+				gUpdateDisplay = true;
+			#endif
 		}
 		else
 		{
-			#ifdef ENABLE_ENCRYPTION
+			#ifdef ENABLE_ENCRYPTION // won't compile with APRS
 				if(dataPacket.data.header == ENCRYPTED_MESSAGE_PACKET)
 				{
 					CRYPTO_Crypt(dataPacket.data.payload,
@@ -407,15 +449,26 @@ void MSG_HandleReceive(){
 	}
 
 	// Transmit a message to the sender that we have received the message
-	if (dataPacket.data.header == MESSAGE_PACKET ||
-		dataPacket.data.header == ENCRYPTED_MESSAGE_PACKET)
-	{
-		// wait so the correspondent radio can properly receive it
-		SYSTEM_DelayMs(700);
-
-		if(gEeprom.MESSENGER_CONFIG.data.ack)
-			MSG_SendAck();
+	if(gEeprom.MESSENGER_CONFIG.data.ack) {
+		#ifdef ENABLE_APRS
+			uint16_t ack_id = get_msg_id(ax25frame);
+			if(send_ack && ack_id)
+		#else
+			if (dataPacket.data.header == MESSAGE_PACKET ||
+				dataPacket.data.header == ENCRYPTED_MESSAGE_PACKET)
+		#endif
+		{
+			// wait so the correspondent radio can properly receive it
+			SYSTEM_DelayMs(700);
+			
+			#ifdef ENABLE_APRS
+				MSG_SendAck(ack_id);
+			#else
+				MSG_SendAck();
+			#endif
+		}
 	}
+	
 }
 
 // ---------------------------------------------------------------------------------
@@ -545,7 +598,13 @@ void  MSG_ProcessKeys(KEY_Code_t Key, bool bKeyPressed, bool bKeyHeld) {
 
 void MSG_ClearPacketBuffer()
 {
-	memset(dataPacket.serializedArray, 0, sizeof(dataPacket.serializedArray));
+	#ifdef ENABLE_APRS
+		memset(ax25frame.buffer, 0, sizeof(ax25frame.buffer));
+		ax25frame.control_offset = -1;
+		ax25frame.fcs_offset = -1;
+	#else
+		memset(dataPacket.serializedArray, 0, sizeof(dataPacket.serializedArray));
+	#endif
 }
 
 void MSG_Send(const char *cMessage){
