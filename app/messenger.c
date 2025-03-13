@@ -394,8 +394,9 @@ void MSG_SendAck() {
 	// in the future we might reply with received payload and then the sending radio
 	// could compare it and determine if the messegage was read correctly (kamilsss655)
 	#ifdef ENABLE_APRS
-		uint8_t origin_callsign[DEST_SIZE + 1];
-		origin_callsign[DEST_SIZE] = 0;
+		char origin_callsign[SRC_SIZE + 1];
+		origin_callsign[SRC_SIZE] = 0;
+		strncpy(origin_callsign, ax25frame.buffer + 1 + DEST_SIZE, SRC_SIZE);
 		MSG_ClearPacketBuffer();
 		APRS_prepare_ack(ax25frame, ack_id, origin_callsign);
 	#else

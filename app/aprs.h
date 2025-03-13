@@ -24,7 +24,7 @@ typedef struct {
 #define DIGI_MAX_SIZE DIGI_CALL_SIZE * MAX_DIGIS
 #define INFO_MAX_SIZE 256
 
-extern const uint8_t * aprs_destination;
+extern const char * aprs_destination;
 
 #define AX25_FLAG            0x7E
 #define AX25_CONTROL_UI      0x03
@@ -52,14 +52,14 @@ extern const uint8_t * aprs_destination;
 //    uint8_t end_flag; // for alignment purposes
 //  } AX25Frame;
 typedef struct {
-    uint8_t control_offset;
-    uint16_t fcs_offset;
-    uint8_t buffer[APRS_BUFFER_SIZE];
+    int8_t control_offset;
+    int16_t fcs_offset;
+    char buffer[APRS_BUFFER_SIZE];
 } AX25Frame;
 
 extern uint16_t msg_id;
 
-uint16_t APRS_compute_fcs(const uint8_t *data, uint16_t len);
+uint16_t APRS_compute_fcs(const char *data, uint16_t len);
 uint8_t APRS_is_ack_for_message(AX25Frame frame, uint16_t for_message_id);
 uint8_t APRS_is_ack(AX25Frame frame);
 void APRS_set_fcs(AX25Frame *frame);
@@ -68,7 +68,7 @@ uint8_t APRS_is_valid(AX25Frame frame);
 uint8_t APRS_destined_to_user(AX25Frame frame);
 uint16_t APRS_get_msg_id(AX25Frame frame);
 uint8_t APRS_parse_offsets(AX25Frame frame);
-void APRS_prepare_ack(AX25Frame frame, uint16_t for_message_id, uint8_t * for_callsign);
+void APRS_prepare_ack(AX25Frame frame, uint16_t for_message_id, char * for_callsign);
 void APRS_prepare_message(AX25Frame frame, const char * message);
 
 
