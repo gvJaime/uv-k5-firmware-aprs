@@ -1785,63 +1785,39 @@ static void MENU_Key_UP_DOWN(bool bKeyPressed, bool bKeyHeld, int8_t Direction)
 	)
 	{	
 		#ifdef ENABLE_APRS
-			if(UI_MENU_GetCurrentMenuId() == MENU_APRS_SSID) {
-				// change the number
-				if (bKeyPressed && edit_index < 2 && Direction != 0)
+			char top_char;
+			char bottom_char;
+			const char   unwanted[] = "./:;<=>?@";
+			switch(UI_MENU_GetCurrentMenuId()) {
+				case MENU_APRS_SSID:
+					top_char = '9';
+					bottom_char = '0';
+					break;
+				case MENU_APRS_CALLSIGN:
+					top_char = 'Z';
+					bottom_char = '0';
+					break;
+				default:
+					// then it's path. Allow hyphens
+					top_char = 'Z';
+					bottom_char = '-';
+					break;
+			}
+			if (bKeyPressed && edit_index < PATH_SIZE && Direction != 0)
+			{
+				char         c          = edit[edit_index] + Direction;
+				unsigned int i          = 0;
+				while (i < sizeof(unwanted) && c >= bottom_char && c <= top_char)
 				{
-					const char   unwanted[] = "$%&!\"':;?^`|{}";
-					char         c          = edit[edit_index] + Direction;
-					unsigned int i          = 0;
-					while (i < sizeof(unwanted) && c >= '0' && c <= '9')
-					{
-						if (c == unwanted[i++])
-						{	// choose next character
-							c += Direction;
-							i = 0;
-						}
+					if (c == unwanted[i++])
+					{	// choose next character
+						c += Direction;
+						i = 0;
 					}
-					edit[edit_index] = (c < '0') ? '9' : (c > '9') ? '0' : c;
-
-					gRequestDisplayScreen = DISPLAY_MENU;
 				}
-			} else if (UI_MENU_GetCurrentMenuId() == MENU_APRS_CALLSIGN) {
-				// change the character
-				if (bKeyPressed && edit_index < CALLSIGN_SIZE && Direction != 0)
-				{
-					const char   unwanted[] = "./:;<=>?@";
-					char         c          = edit[edit_index] + Direction;
-					unsigned int i          = 0;
-					while (i < sizeof(unwanted) && c >= '0' && c <= 'Z')
-					{
-						if (c == unwanted[i++])
-						{	// choose next character
-							c += Direction;
-							i = 0;
-						}
-					}
-					edit[edit_index] = (c < '0') ? 'Z' : (c > 'Z') ? '0' : c;
+				edit[edit_index] = (c < bottom_char) ? top_char : (c > top_char) ? bottom_char : c;
 
-					gRequestDisplayScreen = DISPLAY_MENU;
-				}
-			} else {
-				// then it's path
-				if (bKeyPressed && edit_index < PATH_SIZE && Direction != 0)
-				{
-					const char   unwanted[] = "./:;<=>?@";
-					char         c          = edit[edit_index] + Direction;
-					unsigned int i          = 0;
-					while (i < sizeof(unwanted) && c >= '-' && c <= 'Z')
-					{
-						if (c == unwanted[i++])
-						{	// choose next character
-							c += Direction;
-							i = 0;
-						}
-					}
-					edit[edit_index] = (c < '-') ? 'Z' : (c > 'Z') ? '-' : c;
-
-					gRequestDisplayScreen = DISPLAY_MENU;
-				}
+				gRequestDisplayScreen = DISPLAY_MENU;
 			}
 		#else // would be cleaner to not repeat this chunk of code, but changing control flow from macros seems even worse
 			// change the character
