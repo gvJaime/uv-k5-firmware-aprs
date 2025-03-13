@@ -1,7 +1,8 @@
 #ifdef ENABLE_APRS
+#include <string.h>
 #include <stdint.h>
-#include <stdio.h>
 #include <stdlib.h>
+#include "external/printf/printf.h"
 
 #include "app/messenger.h"
 
