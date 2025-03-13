@@ -410,22 +410,24 @@ void MSG_SendAck() {
 	MSG_SendPacket();
 }
 
-void MSG_DisplayMessage(char * field) {
-	// dump the message onto the display
-	snprintf(field, SRC_SIZE - 1, "%s", ax25frame.buffer + 1 + DEST_SIZE);
-	snprintf(
-		field + sizeof(field), // copy exactly after the source
-		3, // enough to fit a 0 to 15 number and a hyphen
-		"-%d",
-		ax25frame.buffer[1 + DEST_SIZE + SRC_SIZE - 1] && 0xFF // get the last byte of the src
-	);
-	snprintf(
-		field + sizeof(field), // copy exactly after the destination
-		ax25frame.fcs_offset - ax25frame.control_offset, // the length is the number of bytes between the control flag and the fcs minus one.
-		":%s", // but that minus one is not stated, because we need that "one" for the starting colons.
-		ax25frame.buffer + ax25frame.control_offset + 1
-	);
-}
+#ifdef ENABLE_APRS
+	void MSG_DisplayMessage(char * field) {
+		// dump the message onto the display
+		snprintf(field, SRC_SIZE - 1, "%s", ax25frame.buffer + 1 + DEST_SIZE);
+		snprintf(
+			field + sizeof(field), // copy exactly after the source
+			3, // enough to fit a 0 to 15 number and a hyphen
+			"-%d",
+			ax25frame.buffer[1 + DEST_SIZE + SRC_SIZE - 1] && 0xFF // get the last byte of the src
+		);
+		snprintf(
+			field + sizeof(field), // copy exactly after the destination
+			ax25frame.fcs_offset - ax25frame.control_offset, // the length is the number of bytes between the control flag and the fcs minus one.
+			":%s", // but that minus one is not stated, because we need that "one" for the starting colons.
+			ax25frame.buffer + ax25frame.control_offset + 1
+		);
+	}
+#endif
 
 void MSG_HandleReceive() {
 	#ifdef ENABLE_APRS
