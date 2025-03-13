@@ -113,11 +113,11 @@ void APRS_prepare_ack(AX25Frame frame, uint16_t for_message_id, char * for_calls
     char message[ACK_SIZE];
     memset(message, 0 , ACK_SIZE * sizeof(char));
     sprintf(message, ":%s:ack%d", for_callsign, for_message_id);
-    APRS_prepare_message(frame, message);
+    APRS_prepare_message(frame, message, true);
 }
 
 // TODO: Bit stuffing per section 3.6 of AX25 spec if needed
-void APRS_prepare_message(AX25Frame frame, const char * message) {
+void APRS_prepare_message(AX25Frame frame, const char * message, uint8_t is_ack) {
     frame.buffer[0] = AX25_FLAG;
     memset(frame.buffer, 0, APRS_BUFFER_SIZE);
     strncpy(frame.buffer + 1, aprs_destination, 7);
@@ -134,7 +134,8 @@ void APRS_prepare_message(AX25Frame frame, const char * message) {
     frame.buffer[frame.fcs_offset] = (fcs >> 8) & 0xFF;  // MSB first
     frame.buffer[frame.fcs_offset + 1] = fcs & 0xFF;     // LSB
     frame.buffer[frame.fcs_offset + 1] = AX25_FLAG;
-    msg_id++;
+    if(!is_ack)
+        msg_id++;
 }
 
 #endif

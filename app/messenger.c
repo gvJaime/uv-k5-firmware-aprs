@@ -679,7 +679,7 @@ void MSG_Send(const char *cMessage){
 		}
 	#endif
 	#ifdef ENABLE_APRS
-		APRS_prepare_message(ax25frame, cMessage);
+		APRS_prepare_message(ax25frame, cMessage, false);
 	#else
 		dataPacket.data.header=MESSAGE_PACKET;
 		memcpy(dataPacket.data.payload, cMessage, sizeof(dataPacket.data.payload));
