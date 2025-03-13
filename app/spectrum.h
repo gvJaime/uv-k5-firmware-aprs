@@ -17,6 +17,8 @@
 #ifndef SPECTRUM_H
 #define SPECTRUM_H
 
+#ifdef ENABLE_SPECTRUM
+
 #include "../bitmaps.h"
 #include "../board.h"
 #include "../bsp/dp32g030/gpio.h"
@@ -166,7 +168,7 @@ typedef struct PeakInfo {
 } PeakInfo;
 #ifdef ENABLE_SPECTRUM_CHANNEL_SCAN
 void APP_RunSpectrum(Mode mode);
-#elif
+#else
 void APP_RunSpectrum(void);
 #endif
 
@@ -174,6 +176,8 @@ void APP_RunSpectrum(void);
 #ifdef ENABLE_SPECTRUM_SHOW_CHANNEL_NAME
   void LookupChannelInfo();
 #endif
+
+#endif // ENABLE_SPECTRUM
 
 #endif /* ifndef SPECTRUM_H */
 

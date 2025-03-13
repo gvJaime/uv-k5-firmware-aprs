@@ -44,4 +44,7 @@ void UI_DrawDottedLineBuffer(uint8_t (*buffer)[128], int16_t x1, int16_t y1, int
 void PutPixel(uint8_t x, uint8_t y, bool fill);
 void PutPixelStatus(uint8_t x, uint8_t y, bool fill);
 void DrawVLine(int sy, int ey, int nx, bool fill);
-void GUI_DisplaySmallest(const char *pString, uint8_t x, uint8_t y, bool statusbar, bool fill);
+
+#if defined (ENABLE_SPECTRUM) || defined (ENABLE_MESSENGER)
+	void GUI_DisplaySmallest(const char *pString, uint8_t x, uint8_t y, bool statusbar, bool fill);
+#endif

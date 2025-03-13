@@ -486,7 +486,7 @@ const uint8_t gFontSmall[95-1][6] =
 	};
 #endif
 
-#ifdef ENABLE_SPECTRUM
+#if defined (ENABLE_SPECTRUM) || defined (ENABLE_MESSENGER)
 	const uint8_t gFont3x5[][3] =
 	{
 		{0x00, 0x00, 0x00}, //  32 - space

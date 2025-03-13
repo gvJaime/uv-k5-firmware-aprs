@@ -248,6 +248,7 @@ void ACTION_Scan(bool bRestart)
 	}
 #endif
 
+#ifdef ENABLE_SPECTRUM
 void ACTION_RunSpectrum(void)
 {
 	#ifdef ENABLE_SPECTRUM_CHANNEL_SCAN
@@ -261,10 +262,11 @@ void ACTION_RunSpectrum(void)
 			// otherwise enter spectrum in frequency mode
 			APP_RunSpectrum(IS_MR_CHANNEL(gTxVfo->CHANNEL_SAVE));
 		}
-	#elif
+	#else
 		APP_RunSpectrum();
 	#endif
 }
+#endif
 
 void ACTION_SwitchDemodul(void)
 {
@@ -428,9 +430,11 @@ void ACTION_Handle(KEY_Code_t Key, bool bKeyPressed, bool bKeyHeld)
 			gTxVfo->CHANNEL_BANDWIDTH =
 				ACTION_NextBandwidth(gTxVfo->CHANNEL_BANDWIDTH, gTxVfo->Modulation != MODULATION_AM);
 			break;
+		#ifdef ENABLE_SPECTRUM
 		case ACTION_OPT_SPECTRUM:
 			ACTION_RunSpectrum();
 			break;
+		#endif
 #ifdef ENABLE_BLMIN_TMP_OFF
 		case ACTION_OPT_BLMIN_TMP_OFF:
 			ACTION_BlminTmpOff();
