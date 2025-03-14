@@ -119,8 +119,8 @@ void APRS_prepare_ack(AX25Frame frame, uint16_t for_message_id, char * for_calls
 
 // TODO: Bit stuffing per section 3.6 of AX25 spec if needed
 void APRS_prepare_message(AX25Frame frame, const char * message, uint8_t is_ack) {
-    frame.buffer[0] = AX25_FLAG;
     memset(frame.buffer, 0, APRS_BUFFER_SIZE);
+    frame.buffer[0] = AX25_FLAG;
     strncpy(frame.buffer + 1, aprs_destination, 7);
     strncpy(frame.buffer + 1 + DEST_SIZE, gEeprom.APRS_CONFIG.callsign, SRC_SIZE - 1);
     frame.buffer[1 + DEST_SIZE + SRC_SIZE - 1] = gEeprom.APRS_CONFIG.ssid;
@@ -129,7 +129,7 @@ void APRS_prepare_message(AX25Frame frame, const char * message, uint8_t is_ack)
     frame.control_offset = 1 + DEST_SIZE + SRC_SIZE + DIGI_CALL_SIZE * 2;
     frame.buffer[frame.control_offset] = AX25_CONTROL_UI;
     frame.buffer[frame.control_offset + 1] = AX25_PID_NO_LAYER3;
-    snprintf(frame.buffer + frame.control_offset + 2, INFO_MAX_SIZE, ":%s", message);
+    snprintf(frame.buffer + frame.control_offset + 2, INFO_MAX_SIZE, ":%s{%d", message,msg_id);
     frame.fcs_offset = sizeof(frame.buffer);
     uint16_t fcs = APRS_compute_fcs(frame.buffer, frame.fcs_offset);
     frame.buffer[frame.fcs_offset] = (fcs >> 8) & 0xFF;  // MSB first
