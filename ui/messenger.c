@@ -83,7 +83,7 @@ void UI_DisplayMSG(void) {
 	GUI_DisplaySmallest(String, 5, 38, false, true);
 
 	memset(String, 0, sizeof(String));
-	sprintf(String, "%s_", cMessage);
+	snprintf(String, sizeof(String), "%s_", cMessage);
 	//UI_PrintStringSmall(String, 3, 0, 6);
 	GUI_DisplaySmallest(String, 5, 48, false, true);
 

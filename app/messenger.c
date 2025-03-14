@@ -686,6 +686,140 @@ void MSG_Send(const char *cMessage){
 	MSG_SendPacket();
 }
 
+#ifdef ENABLE_APRS
+void MSG_ConfigureFSK(bool rx)
+{
+	// REG_70
+	//
+	// <15>   0 Enable TONE1
+	//        1 = Enable
+	//        0 = Disable
+	//
+	// <14:8> 0 TONE1 tuning gain
+	//        0 ~ 127
+	//
+	// <7>    0 Enable TONE2
+	//        1 = Enable
+	//        0 = Disable
+	//
+	// <6:0>  0 TONE2/FSK tuning gain
+	//        0 ~ 127
+	//
+	BK4819_WriteRegister(BK4819_REG_70,
+		( 0u << 15) |    // 0
+		( 0u <<  8) |    // 0
+		( 1u <<  7) |    // 1
+		(96u <<  0));    // 96
+
+	// Tone2 = FSK baudrate                       // kamilsss655 2024
+	
+	TONE2_FREQ = 12389u;
+
+	BK4819_WriteRegister(BK4819_REG_72, TONE2_FREQ);
+	
+	BK4819_WriteRegister(BK4819_REG_58,
+		(3u << 13) |		// 1 FSK TX mode selection
+							//   0 = FSK 1.2K and FSK 2.4K TX .. no tones, direct FM
+							//   1 = FFSK 1200 / 1800 TX
+							//   2 = ???
+							//   3 = FFSK 1200 / 2400 TX
+							//   4 = ???
+							//   5 = NOAA SAME TX
+							//   6 = ???
+							//   7 = ???
+							//
+		(4u << 10) |		// 0 FSK RX mode selection
+							//   0 = FSK 1.2K, FSK 2.4K RX and NOAA SAME RX .. no tones, direct FM
+							//   1 = ???
+							//   2 = ???
+							//   3 = ???
+							//   4 = FFSK 1200 / 2400 RX
+							//   5 = ???
+							//   6 = ???
+							//   7 = FFSK 1200 / 1800 RX
+							//
+		(3u << 8) |			// 0 FSK RX gain
+							//   0 ~ 3
+							//
+		(0u << 6) |			// 0 ???
+							//   0 ~ 3
+							//
+		(0u << 4) |			// 0 FSK preamble type selection
+							//   0 = 0xAA or 0x55 due to the MSB of FSK sync byte 0
+							//   1 = ???
+							//   2 = 0x55
+							//   3 = 0xAA
+							//
+		(4u << 1) |			// 1 FSK RX bandwidth setting
+							//   0 = FSK 1.2K .. no tones, direct FM
+							//   1 = FFSK 1200 / 1800
+							//   2 = NOAA SAME RX
+							//   3 = ???
+							//   4 = FSK 2.4K and FFSK 1200 / 2400
+							//   5 = ???
+							//   6 = ???
+							//   7 = ???
+							//
+		(1u << 0));			// 1 FSK enable
+							//   0 = disable
+							//   1 = enable
+
+	// REG_5A .. bytes 0 & 1 sync pattern
+	//
+	// <15:8> sync byte 0
+	// < 7:0> sync byte 1
+	BK4819_WriteRegister(BK4819_REG_5A, 0x3072);
+
+	// REG_5B .. bytes 2 & 3 sync pattern
+	//
+	// <15:8> sync byte 2
+	// < 7:0> sync byte 3
+	BK4819_WriteRegister(BK4819_REG_5B, 0x576C);
+
+	// disable CRC
+	BK4819_WriteRegister(BK4819_REG_5C, 0x5625);
+
+	// set the almost full threshold
+	if(rx)
+		BK4819_WriteRegister(BK4819_REG_5E, (64u << 3) | (1u << 0));  // 0 ~ 127, 0 ~ 7
+
+	// packet size .. sync + packet - size of a single packet
+
+	#ifdef ENABLE_APRS // this is possibly going to be too big.
+		uint16_t size = sizeof(ax25frame.buffer);
+	#else
+		uint16_t size = sizeof(dataPacket.serializedArray);
+	#endif
+	// size -= (fsk_reg59 & (1u << 3)) ? 4 : 2;
+	if(rx)
+		size = (((size + 1) / 2) * 2) + 2;             // round up to even, else FSK RX doesn't work
+
+	BK4819_WriteRegister(BK4819_REG_5D, (size << 8));
+	// BK4819_WriteRegister(BK4819_REG_5D, ((sizeof(dataPacket.serializedArray)) << 8));
+
+	// clear FIFO's
+	BK4819_FskClearFifo();
+
+	// configure main FSK params
+	BK4819_WriteRegister(BK4819_REG_59,
+				(0u        <<       15) |   // 0/1     1 = clear TX FIFO
+				(0u        <<       14) |   // 0/1     1 = clear RX FIFO
+				(0u        <<       13) |   // 0/1     1 = scramble
+				(0u        <<       12) |   // 0/1     1 = enable RX
+				(0u        <<       11) |   // 0/1     1 = enable TX
+				(0u        <<       10) |   // 0/1     1 = invert data when RX
+				(0u        <<        9) |   // 0/1     1 = invert data when TX
+				(0u        <<        8) |   // 0/1     ???
+				((rx ? 0u : 15u) <<  4) |   // 0 ~ 15  preamble length .. bit toggling
+				(1u        <<        3) |   // 0/1     sync length
+				(0u        <<        0)     // 0 ~ 7   ???
+				
+	);
+
+	// clear interupts
+	BK4819_WriteRegister(BK4819_REG_02, 0);
+}
+#else
 void MSG_ConfigureFSK(bool rx)
 {
 	// REG_70
@@ -882,5 +1016,6 @@ void MSG_ConfigureFSK(bool rx)
 	// clear interupts
 	BK4819_WriteRegister(BK4819_REG_02, 0);
 }
+#endif
 
 #endif
