@@ -120,23 +120,47 @@ void APRS_prepare_ack(AX25Frame frame, uint16_t for_message_id, char * for_calls
 // TODO: Bit stuffing per section 3.6 of AX25 spec if needed
 void APRS_prepare_message(AX25Frame frame, const char * message, uint8_t is_ack) {
     memset(frame.buffer, 0, APRS_BUFFER_SIZE);
+
+    // start bit
     frame.buffer[0] = AX25_FLAG;
+
+    // source, destination and digis
     strncpy(frame.buffer + 1, aprs_destination, 7);
     strncpy(frame.buffer + 1 + DEST_SIZE, gEeprom.APRS_CONFIG.callsign, SRC_SIZE - 1);
     frame.buffer[1 + DEST_SIZE + SRC_SIZE - 1] = gEeprom.APRS_CONFIG.ssid;
     strncpy(frame.buffer + 1 + DEST_SIZE + SRC_SIZE, gEeprom.APRS_CONFIG.path1, DIGI_CALL_SIZE);
     strncpy(frame.buffer + 1 + DEST_SIZE + SRC_SIZE + DIGI_CALL_SIZE, gEeprom.APRS_CONFIG.path2, DIGI_CALL_SIZE);
+
+    // mark control byte offset
     frame.control_offset = 1 + DEST_SIZE + SRC_SIZE + DIGI_CALL_SIZE * 2;
+
+    // set control bytes
     frame.buffer[frame.control_offset] = AX25_CONTROL_UI;
     frame.buffer[frame.control_offset + 1] = AX25_PID_NO_LAYER3;
+
+    // dump message
     snprintf(frame.buffer + frame.control_offset + 2, INFO_MAX_SIZE, ":%s{%d", message,msg_id);
+
+    // mark fcs word offset
     frame.fcs_offset = sizeof(frame.buffer);
+
+    // calculate and write
     uint16_t fcs = APRS_compute_fcs(frame.buffer, frame.fcs_offset);
     frame.buffer[frame.fcs_offset] = (fcs >> 8) & 0xFF;  // MSB first
     frame.buffer[frame.fcs_offset + 1] = fcs & 0xFF;     // LSB
     frame.buffer[frame.fcs_offset + 1] = AX25_FLAG;
+
+    // increase message count
     if(!is_ack)
         msg_id++;
+}
+
+uint16_t APRS_len(AX25Frame frame) {
+    uint16_t i = 0;
+    while(frame.buffer[i] != 0 && i < APRS_BUFFER_SIZE) {
+        i++;
+    }
+    return i;
 }
 
 #endif
