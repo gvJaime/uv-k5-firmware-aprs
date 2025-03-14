@@ -106,7 +106,8 @@ void MSG_FSKSendData();
 void MSG_ClearPacketBuffer();
 #ifdef ENABLE_APRS
   void MSG_SendAck(uint16_t ack_id);
-  void MSG_DisplayMessage(char * field);
+  void MSG_DisplayReceived(char * field);
+  void MSG_DisplaySent(char * field);
 #else
   void MSG_SendAck();
 #endif

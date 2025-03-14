@@ -238,17 +238,13 @@ void MSG_SendPacket() {
 		#endif
 			moveUP(rxMessage);
 			#ifdef ENABLE_APRS
-				MSG_DisplayMessage(rxMessage[3]);
+				MSG_DisplaySent(rxMessage[3]);
 			#else
 				sprintf(rxMessage[3], "> %s", dataPacket.data.payload);
 			#endif
 			memset(lastcMessage, 0, sizeof(lastcMessage));
 			#ifdef ENABLE_APRS
-				memcpy(
-					lastcMessage,
-					ax25frame.buffer + ax25frame.control_offset + 2,
-					ax25frame.fcs_offset - ax25frame.control_offset - 1
-				);
+				MSG_DisplaySent(lastcMessage);
 			#else
 				memcpy(lastcMessage, dataPacket.data.payload, PAYLOAD_LENGTH);
 			#endif
@@ -412,21 +408,26 @@ void MSG_SendAck() {
 }
 
 #ifdef ENABLE_APRS
-	void MSG_DisplayMessage(char * field) {
+	void MSG_DisplayReceived(char * field) {
 		// dump the message onto the display
-		snprintf(field, SRC_SIZE - 1, "%s", ax25frame.buffer + 1 + DEST_SIZE);
+		snprintf(field, CALLSIGN_SIZE, "%s", ax25frame.buffer + 1 + DEST_SIZE);
 		snprintf(
-			field + sizeof(field), // copy exactly after the source
+			field + strlen(field), // copy exactly after the source
 			3, // enough to fit a 0 to 15 number and a hyphen
 			"-%d",
 			ax25frame.buffer[1 + DEST_SIZE + SRC_SIZE - 1] && 0xFF // get the last byte of the src
 		);
 		snprintf(
 			field + strlen(field), // copy exactly after the destination
-			ax25frame.fcs_offset - ax25frame.control_offset, // the length is the number of bytes between the control flag and the fcs minus one.
-			"%s", // but that minus one is not stated, because we need that "one" for the starting colons.
-			ax25frame.buffer + ax25frame.control_offset
+			ax25frame.fcs_offset - ax25frame.control_offset - 2, // the length is the number of bytes between the control flag and the fcs minus one.
+			"> %s", // but that minus one is not stated, because we need that "one" for the starting colons.
+			ax25frame.buffer + ax25frame.control_offset + 2 // control field, plus pid, plus starting colon.
 		);
+	}
+
+	void MSG_DisplaySent(char * field) {
+		// dump the message onto the display
+		snprintf(field, ax25frame.fcs_offset - ax25frame.control_offset - 2, "%s", ax25frame.buffer + ax25frame.control_offset + 3);
 	}
 #endif
 
@@ -471,7 +472,7 @@ void MSG_HandleReceive() {
 				snprintf(rxMessage[3], PAYLOAD_LENGTH + 2, "< %s", dataPacket.data.payload);
 			#else
 				#ifdef ENABLE_APRS
-					MSG_DisplayMessage(rxMessage[3]);
+					MSG_DisplayReceived(rxMessage[3]);
 				#else
 					snprintf(rxMessage[3], PAYLOAD_LENGTH + 2, "< %s", dataPacket.data.payload);
 				#endif

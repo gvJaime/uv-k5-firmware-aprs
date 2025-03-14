@@ -139,9 +139,9 @@ void APRS_prepare_message(AX25Frame* frame, const char * message, uint8_t is_ack
     frame->buffer[0] = AX25_FLAG;
 
     // source, destination and digis
-    strncpy(frame->buffer + 1, aprs_destination, 7);
-    strncpy(frame->buffer + 1 + DEST_SIZE, gEeprom.APRS_CONFIG.callsign, SRC_SIZE - 1);
-    frame->buffer[1 + DEST_SIZE + SRC_SIZE - 1] = gEeprom.APRS_CONFIG.ssid;
+    strncpy(frame->buffer + 1, aprs_destination, DEST_SIZE);
+    strncpy(frame->buffer + 1 + DEST_SIZE, gEeprom.APRS_CONFIG.callsign, CALLSIGN_SIZE);
+    frame->buffer[1 + DEST_SIZE + CALLSIGN_SIZE] = gEeprom.APRS_CONFIG.ssid;
     strncpy(frame->buffer + 1 + DEST_SIZE + SRC_SIZE, gEeprom.APRS_CONFIG.path1, DIGI_CALL_SIZE);
     strncpy(frame->buffer + 1 + DEST_SIZE + SRC_SIZE + DIGI_CALL_SIZE, gEeprom.APRS_CONFIG.path2, DIGI_CALL_SIZE);
 

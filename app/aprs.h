@@ -18,7 +18,7 @@ typedef struct {
 } APRSConfig;
 
 #define DEST_SIZE 7
-#define SRC_SIZE 7
+#define SRC_SIZE CALLSIGN_SIZE + 1
 #define DIGI_CALL_SIZE 7
 #define MAX_DIGIS 8
 #define DIGI_MAX_SIZE DIGI_CALL_SIZE * MAX_DIGIS
