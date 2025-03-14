@@ -54,6 +54,7 @@ extern const char * aprs_destination;
 typedef struct {
     int8_t control_offset;
     int16_t fcs_offset;
+    uint16_t len;
     char buffer[APRS_BUFFER_SIZE];
 } AX25Frame;
 
@@ -64,13 +65,12 @@ uint8_t APRS_is_ack_for_message(AX25Frame frame, uint16_t for_message_id);
 uint8_t APRS_is_ack(AX25Frame frame);
 void APRS_set_fcs(AX25Frame *frame);
 uint8_t APRS_check_fcs(AX25Frame *frame);
-uint8_t APRS_is_valid(AX25Frame frame);
+uint8_t APRS_validate(AX25Frame frame);
 uint8_t APRS_destined_to_user(AX25Frame frame);
 uint16_t APRS_get_msg_id(AX25Frame frame);
-uint8_t APRS_parse_offsets(AX25Frame frame);
 void APRS_prepare_ack(AX25Frame frame, uint16_t for_message_id, char * for_callsign);
 void APRS_prepare_message(AX25Frame frame, const char * message, uint8_t is_ack);
-uint16_t APRS_len(AX25Frame frame);
+void APRS_clear(AX25Frame frame);
 
 
 #endif

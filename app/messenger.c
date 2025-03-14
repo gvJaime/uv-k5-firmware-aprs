@@ -134,7 +134,7 @@ void MSG_FSKSendData() {
 
 	{	// load the entire packet data into the TX FIFO buffer
 		#ifdef ENABLE_APRS
-		for (size_t i = 0, j = 0; i < APRS_len(ax25frame); i += 2, j++) {
+		for (size_t i = 0, j = 0; i < ax25frame.len; i += 2, j++) {
         	BK4819_WriteRegister(BK4819_REG_5F, (ax25frame.buffer[i + 1] << 8) | ax25frame.buffer[i]);
     	}
 		#else
@@ -212,7 +212,7 @@ void MSG_SendPacket() {
 	if ( msgStatus != READY ) return;
 
 	#ifdef ENABLE_APRS
-		if ( APRS_len(ax25frame) > 0) { // in the aprs implementation this function is expected to be called after checks
+		if ( ax25frame.len > 0) { // in the aprs implementation this function is expected to be called after checks
 	#else
 		if ( strlen((char *)dataPacket.data.payload) > 0) {
 	#endif
@@ -432,10 +432,7 @@ void MSG_SendAck() {
 
 void MSG_HandleReceive() {
 	#ifdef ENABLE_APRS
-		uint8_t valid = APRS_is_valid(ax25frame);
-		if(valid) {
-			valid = APRS_parse_offsets(ax25frame);
-		}
+		uint8_t valid = APRS_validate(ax25frame);
 		uint8_t send_ack = 0;
 		if(valid && APRS_destined_to_user(ax25frame)) {
 	#else
@@ -661,9 +658,7 @@ void  MSG_ProcessKeys(KEY_Code_t Key, bool bKeyPressed, bool bKeyHeld) {
 void MSG_ClearPacketBuffer()
 {
 	#ifdef ENABLE_APRS
-		memset(ax25frame.buffer, 0, APRS_BUFFER_SIZE);
-		ax25frame.control_offset = -1;
-		ax25frame.fcs_offset = -1;
+		APRS_clear(ax25frame);
 	#else
 		memset(dataPacket.serializedArray, 0, sizeof(dataPacket.serializedArray));
 	#endif

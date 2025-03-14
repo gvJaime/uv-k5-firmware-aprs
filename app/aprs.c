@@ -42,17 +42,30 @@ uint16_t APRS_compute_fcs(const char *data, uint16_t len) {
     return ~crc;
 }
 
-uint8_t APRS_is_valid(AX25Frame frame) {
-    const char *p = frame.buffer;
-    if(p[0] != 0x7E || p[strlen(p) - 1] != 0x7E)
-        return false;
-    return APRS_check_fcs(&frame);
-}
-
 uint8_t APRS_parse_offsets(AX25Frame frame) {
     frame.control_offset = find_offset(frame.buffer, APRS_BUFFER_SIZE, AX25_CONTROL_UI, 1 + DEST_SIZE + SRC_SIZE);
     frame.fcs_offset = find_offset(frame.buffer, APRS_BUFFER_SIZE, AX25_FLAG, frame.control_offset) - 2;
     return frame.control_offset != -1 && frame.fcs_offset != -1;
+}
+
+uint8_t APRS_validate(AX25Frame frame) {
+    // must start with correct flag
+    if(frame.buffer[0] != AX25_FLAG) {
+        frame.len = 0;
+        return 0;
+    }
+
+    // seek end flag
+    uint16_t i = 1;
+    while(i < APRS_BUFFER_SIZE && frame.buffer[i] != AX25_FLAG) {
+        i++;
+    }
+
+    frame.len = i;
+
+    APRS_parse_offsets(frame);
+
+    return APRS_check_fcs(&frame);
 }
 
 // we only compare the message id for now
@@ -142,25 +155,26 @@ void APRS_prepare_message(AX25Frame frame, const char * message, uint8_t is_ack)
     snprintf(frame.buffer + frame.control_offset + 2, INFO_MAX_SIZE, ":%s{%d", message,msg_id);
 
     // mark fcs word offset
-    frame.fcs_offset = sizeof(frame.buffer);
+    frame.fcs_offset = strlen(frame.buffer + frame.control_offset + 2) + frame.control_offset + 2;
 
     // calculate and write
     uint16_t fcs = APRS_compute_fcs(frame.buffer, frame.fcs_offset);
     frame.buffer[frame.fcs_offset] = (fcs >> 8) & 0xFF;  // MSB first
     frame.buffer[frame.fcs_offset + 1] = fcs & 0xFF;     // LSB
-    frame.buffer[frame.fcs_offset + 1] = AX25_FLAG;
+    frame.buffer[frame.fcs_offset + 2] = AX25_FLAG;
+
+    frame.len = frame.fcs_offset + 3;
 
     // increase message count
     if(!is_ack)
         msg_id++;
 }
 
-uint16_t APRS_len(AX25Frame frame) {
-    uint16_t i = 0;
-    while(frame.buffer[i] != 0 && i < APRS_BUFFER_SIZE) {
-        i++;
-    }
-    return i;
+void APRS_clear(AX25Frame frame) {
+    memset(frame.buffer, 0, APRS_BUFFER_SIZE);
+    frame.len = 0;
+    frame.control_offset = -1;
+    frame.fcs_offset = -1;
 }
 
 #endif
