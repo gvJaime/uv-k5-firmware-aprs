@@ -56,7 +56,7 @@ uint16_t TONE2_FREQ;
 #define NEXT_CHAR_DELAY 100 // 10ms tick
 
 char T9TableLow[9][4] = { {',', '.', '?', '!'}, {'a', 'b', 'c', '\0'}, {'d', 'e', 'f', '\0'}, {'g', 'h', 'i', '\0'}, {'j', 'k', 'l', '\0'}, {'m', 'n', 'o', '\0'}, {'p', 'q', 'r', 's'}, {'t', 'u', 'v', '\0'}, {'w', 'x', 'y', 'z'} };
-char T9TableUp[9][4] = { {',', '.', '?', '!'}, {'A', 'B', 'C', '\0'}, {'D', 'E', 'F', '\0'}, {'G', 'H', 'I', '\0'}, {'J', 'K', 'L', '\0'}, {'M', 'N', 'O', '\0'}, {'P', 'Q', 'R', 'S'}, {'T', 'U', 'V', '\0'}, {'W', 'X', 'Y', 'Z'} };
+char T9TableUp[9][4] = { {',', '.', '-', ':'}, {'A', 'B', 'C', '\0'}, {'D', 'E', 'F', '\0'}, {'G', 'H', 'I', '\0'}, {'J', 'K', 'L', '\0'}, {'M', 'N', 'O', '\0'}, {'P', 'Q', 'R', 'S'}, {'T', 'U', 'V', '\0'}, {'W', 'X', 'Y', 'Z'} };
 unsigned char numberOfLettersAssignedToKey[9] = { 4, 3, 3, 3, 3, 3, 4, 3, 4 };
 
 char T9TableNum[9][4] = { {'1', '\0', '\0', '\0'}, {'2', '\0', '\0', '\0'}, {'3', '\0', '\0', '\0'}, {'4', '\0', '\0', '\0'}, {'5', '\0', '\0', '\0'}, {'6', '\0', '\0', '\0'}, {'7', '\0', '\0', '\0'}, {'8', '\0', '\0', '\0'}, {'9', '\0', '\0', '\0'} };
@@ -211,18 +211,19 @@ void MSG_SendPacket() {
 
 	if ( msgStatus != READY ) return;
 
-	RADIO_PrepareTX();
-
-	if(RADIO_GetVfoState() != VFO_STATE_NORMAL){
-		gRequestDisplayScreen = DISPLAY_MAIN;
-		return;
-	} 
-
 	#ifdef ENABLE_APRS
 		if ( strlen((char *)ax25frame.buffer) > 0) { // in the aprs implementation this function is expected to be called after checks
 	#else
 		if ( strlen((char *)dataPacket.data.payload) > 0) {
 	#endif
+
+		RADIO_PrepareTX();
+
+		if(RADIO_GetVfoState() != VFO_STATE_NORMAL){
+			gRequestDisplayScreen = DISPLAY_MAIN;
+			return;
+		}
+
 		msgStatus = SENDING;
 
 		RADIO_SetVfoState(VFO_STATE_NORMAL);
@@ -629,7 +630,9 @@ void  MSG_ProcessKeys(KEY_Code_t Key, bool bKeyPressed, bool bKeyHeld) {
 				break;*/
 			case KEY_MENU:
 				// Send message
-				MSG_Send(cMessage);
+				if(sizeof(cMessage)){
+					MSG_Send(cMessage);
+				}
 				break;
 			case KEY_EXIT:
 				gRequestDisplayScreen = DISPLAY_MAIN;
