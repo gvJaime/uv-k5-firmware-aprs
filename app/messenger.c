@@ -232,7 +232,7 @@ void MSG_SendPacket() {
 
 		// display sent message (before encryption)
 		#ifdef ENABLE_APRS
-		if(!APRS_is_ack(ax25frame)) {
+		if(!APRS_is_ack(&ax25frame)) {
 		#else
 		if (dataPacket.data.header != ACK_PACKET) {
 		#endif
@@ -399,7 +399,7 @@ void MSG_SendAck() {
 		origin_callsign[SRC_SIZE] = 0;
 		strncpy(origin_callsign, ax25frame.buffer + 1 + DEST_SIZE, SRC_SIZE);
 		MSG_ClearPacketBuffer();
-		APRS_prepare_ack(ax25frame, ack_id, origin_callsign);
+		APRS_prepare_ack(&ax25frame, ack_id, origin_callsign);
 	#else
 		MSG_ClearPacketBuffer();
 		// in the future we might reply with received payload and then the sending radio
@@ -422,19 +422,19 @@ void MSG_SendAck() {
 			ax25frame.buffer[1 + DEST_SIZE + SRC_SIZE - 1] && 0xFF // get the last byte of the src
 		);
 		snprintf(
-			field + sizeof(field), // copy exactly after the destination
+			field + strlen(field), // copy exactly after the destination
 			ax25frame.fcs_offset - ax25frame.control_offset, // the length is the number of bytes between the control flag and the fcs minus one.
-			":%s", // but that minus one is not stated, because we need that "one" for the starting colons.
-			ax25frame.buffer + ax25frame.control_offset + 1
+			"%s", // but that minus one is not stated, because we need that "one" for the starting colons.
+			ax25frame.buffer + ax25frame.control_offset
 		);
 	}
 #endif
 
 void MSG_HandleReceive() {
 	#ifdef ENABLE_APRS
-		uint8_t valid = APRS_validate(ax25frame);
+		uint8_t valid = APRS_validate(&ax25frame);
 		uint8_t send_ack = 0;
-		if(valid && APRS_destined_to_user(ax25frame)) {
+		if(valid && APRS_destined_to_user(&ax25frame)) {
 	#else
 		if (dataPacket.data.header >= INVALID_PACKET) {
 	#endif
@@ -442,7 +442,7 @@ void MSG_HandleReceive() {
 	} else {
 		moveUP(rxMessage);
 		#ifdef ENABLE_APRS
-			if (APRS_is_ack_for_message(ax25frame, msg_id)) {
+			if (APRS_is_ack_for_message(&ax25frame, msg_id)) {
 				send_ack = 1;
 		#else
 			if (dataPacket.data.header == ACK_PACKET) {
@@ -508,7 +508,7 @@ void MSG_HandleReceive() {
 	// Transmit a message to the sender that we have received the message
 	if(gEeprom.MESSENGER_CONFIG.data.ack) {
 		#ifdef ENABLE_APRS
-			uint16_t ack_id = APRS_get_msg_id(ax25frame);
+			uint16_t ack_id = APRS_get_msg_id(&ax25frame);
 			if(send_ack && ack_id)
 		#else
 			if (dataPacket.data.header == MESSAGE_PACKET ||
@@ -658,7 +658,7 @@ void  MSG_ProcessKeys(KEY_Code_t Key, bool bKeyPressed, bool bKeyHeld) {
 void MSG_ClearPacketBuffer()
 {
 	#ifdef ENABLE_APRS
-		APRS_clear(ax25frame);
+		APRS_clear(&ax25frame);
 	#else
 		memset(dataPacket.serializedArray, 0, sizeof(dataPacket.serializedArray));
 	#endif
@@ -677,7 +677,7 @@ void MSG_Send(const char *cMessage){
 		}
 	#endif
 	#ifdef ENABLE_APRS
-		APRS_prepare_message(ax25frame, cMessage, false);
+		APRS_prepare_message(&ax25frame, cMessage, false);
 	#else
 		dataPacket.data.header=MESSAGE_PACKET;
 		memcpy(dataPacket.data.payload, cMessage, sizeof(dataPacket.data.payload));

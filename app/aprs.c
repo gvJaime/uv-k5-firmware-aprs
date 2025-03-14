@@ -42,35 +42,35 @@ uint16_t APRS_compute_fcs(const char *data, uint16_t len) {
     return ~crc;
 }
 
-uint8_t APRS_parse_offsets(AX25Frame frame) {
-    frame.control_offset = find_offset(frame.buffer, APRS_BUFFER_SIZE, AX25_CONTROL_UI, 1 + DEST_SIZE + SRC_SIZE);
-    frame.fcs_offset = find_offset(frame.buffer, APRS_BUFFER_SIZE, AX25_FLAG, frame.control_offset) - 2;
-    return frame.control_offset != -1 && frame.fcs_offset != -1;
+uint8_t APRS_parse_offsets(AX25Frame* frame) {
+    frame->control_offset = find_offset(frame->buffer, APRS_BUFFER_SIZE, AX25_CONTROL_UI, 1 + DEST_SIZE + SRC_SIZE);
+    frame->fcs_offset = find_offset(frame->buffer, APRS_BUFFER_SIZE, AX25_FLAG, frame->control_offset) - 2;
+    return frame->control_offset != -1 && frame->fcs_offset != -1;
 }
 
-uint8_t APRS_validate(AX25Frame frame) {
+uint8_t APRS_validate(AX25Frame* frame) {
     // must start with correct flag
-    if(frame.buffer[0] != AX25_FLAG) {
-        frame.len = 0;
+    if(frame->buffer[0] != AX25_FLAG) {
+        frame->len = 0;
         return 0;
     }
 
     // seek end flag
     uint16_t i = 1;
-    while(i < APRS_BUFFER_SIZE && frame.buffer[i] != AX25_FLAG) {
+    while(i < APRS_BUFFER_SIZE && frame->buffer[i] != AX25_FLAG) {
         i++;
     }
 
-    frame.len = i;
+    frame->len = i;
 
     APRS_parse_offsets(frame);
 
-    return APRS_check_fcs(&frame);
+    return APRS_check_fcs(frame);
 }
 
 // we only compare the message id for now
-uint8_t APRS_is_ack_for_message(AX25Frame frame, uint16_t for_message_id) {
-    const char *p = frame.buffer + frame.control_offset + 2;
+uint8_t APRS_is_ack_for_message(AX25Frame* frame, uint16_t for_message_id) {
+    const char *p = frame->buffer + frame->control_offset + 2;
     // Check that the payload starts with ':' and the fixed sequence ":ack" is at the correct offset.
     if (p[0] != ':' || memcmp(&p[10], ":ack", 4) != 0)
         return 0;
@@ -80,8 +80,8 @@ uint8_t APRS_is_ack_for_message(AX25Frame frame, uint16_t for_message_id) {
 }
 
 // we only compare the message id for now
-uint8_t APRS_is_ack(AX25Frame frame) {
-    const char *p = frame.buffer + frame.control_offset + 2;
+uint8_t APRS_is_ack(AX25Frame* frame) {
+    const char *p = frame->buffer + frame->control_offset + 2;
     // Check that the payload starts with ':' and the fixed sequence ":ack" is at the correct offset.
     if (p[0] != ':' || memcmp(&p[10], ":ack", 4) != 0)
         return 0;
@@ -104,17 +104,17 @@ uint8_t APRS_check_fcs(AX25Frame *frame) {
 }
 
 // we check if we are the intended recipient of the message
-uint8_t APRS_destined_to_user(AX25Frame frame) {
-    const char *p = frame.buffer + frame.control_offset + 3;
+uint8_t APRS_destined_to_user(AX25Frame* frame) {
+    const char *p = frame->buffer + frame->control_offset + 3;
     return memcmp(&p[0], gEeprom.APRS_CONFIG.callsign, CALLSIGN_SIZE);
 }
 
-uint16_t APRS_get_msg_id(AX25Frame frame) {
-    int16_t offset = find_offset(frame.buffer, APRS_BUFFER_SIZE, APRS_ACK_TOKEN, frame.control_offset);
+uint16_t APRS_get_msg_id(AX25Frame* frame) {
+    int16_t offset = find_offset(frame->buffer, APRS_BUFFER_SIZE, APRS_ACK_TOKEN, frame->control_offset);
     if(offset != -1) {
-        char * p = frame.buffer + offset;
+        char * p = frame->buffer + offset;
         // set end of buffer to zero to ensure atoi works well. We won't use this anymore anyway
-        memset(frame.buffer + frame.fcs_offset, 0, 3);
+        memset(frame->buffer + frame->fcs_offset, 0, 3);
         return atoi(p);
     } else {
         return 0;
@@ -123,58 +123,59 @@ uint16_t APRS_get_msg_id(AX25Frame frame) {
 
 #define ACK_SIZE 1 + ADDRESSEE_SIZE + 1 + 3 + 5 + 1
 
-void APRS_prepare_ack(AX25Frame frame, uint16_t for_message_id, char * for_callsign) {
-    char message[ACK_SIZE];
-    memset(message, 0 , ACK_SIZE * sizeof(char));
-    sprintf(message, ":%s:ack%d", for_callsign, for_message_id);
-    APRS_prepare_message(frame, message, true);
+char ack_message[ACK_SIZE];
+
+void APRS_prepare_ack(AX25Frame* frame, uint16_t for_message_id, char * for_callsign) {
+    memset(ack_message, 0 , ACK_SIZE * sizeof(char));
+    sprintf(ack_message, ":%s:ack%d", for_callsign, for_message_id);
+    APRS_prepare_message(frame, ack_message, true);
 }
 
 // TODO: Bit stuffing per section 3.6 of AX25 spec if needed
-void APRS_prepare_message(AX25Frame frame, const char * message, uint8_t is_ack) {
-    memset(frame.buffer, 0, APRS_BUFFER_SIZE);
+void APRS_prepare_message(AX25Frame* frame, const char * message, uint8_t is_ack) {
+    memset(frame->buffer, 0, APRS_BUFFER_SIZE);
 
     // start bit
-    frame.buffer[0] = AX25_FLAG;
+    frame->buffer[0] = AX25_FLAG;
 
     // source, destination and digis
-    strncpy(frame.buffer + 1, aprs_destination, 7);
-    strncpy(frame.buffer + 1 + DEST_SIZE, gEeprom.APRS_CONFIG.callsign, SRC_SIZE - 1);
-    frame.buffer[1 + DEST_SIZE + SRC_SIZE - 1] = gEeprom.APRS_CONFIG.ssid;
-    strncpy(frame.buffer + 1 + DEST_SIZE + SRC_SIZE, gEeprom.APRS_CONFIG.path1, DIGI_CALL_SIZE);
-    strncpy(frame.buffer + 1 + DEST_SIZE + SRC_SIZE + DIGI_CALL_SIZE, gEeprom.APRS_CONFIG.path2, DIGI_CALL_SIZE);
+    strncpy(frame->buffer + 1, aprs_destination, 7);
+    strncpy(frame->buffer + 1 + DEST_SIZE, gEeprom.APRS_CONFIG.callsign, SRC_SIZE - 1);
+    frame->buffer[1 + DEST_SIZE + SRC_SIZE - 1] = gEeprom.APRS_CONFIG.ssid;
+    strncpy(frame->buffer + 1 + DEST_SIZE + SRC_SIZE, gEeprom.APRS_CONFIG.path1, DIGI_CALL_SIZE);
+    strncpy(frame->buffer + 1 + DEST_SIZE + SRC_SIZE + DIGI_CALL_SIZE, gEeprom.APRS_CONFIG.path2, DIGI_CALL_SIZE);
 
     // mark control byte offset
-    frame.control_offset = 1 + DEST_SIZE + SRC_SIZE + DIGI_CALL_SIZE * 2;
+    frame->control_offset = 1 + DEST_SIZE + SRC_SIZE + DIGI_CALL_SIZE * 2;
 
     // set control bytes
-    frame.buffer[frame.control_offset] = AX25_CONTROL_UI;
-    frame.buffer[frame.control_offset + 1] = AX25_PID_NO_LAYER3;
+    frame->buffer[frame->control_offset] = AX25_CONTROL_UI;
+    frame->buffer[frame->control_offset + 1] = AX25_PID_NO_LAYER3;
 
     // dump message
-    snprintf(frame.buffer + frame.control_offset + 2, INFO_MAX_SIZE, ":%s{%d", message,msg_id);
+    snprintf(frame->buffer + frame->control_offset + 2, INFO_MAX_SIZE, ":%s{%d", message,msg_id);
 
     // mark fcs word offset
-    frame.fcs_offset = strlen(frame.buffer + frame.control_offset + 2) + frame.control_offset + 2;
+    frame->fcs_offset = strlen(frame->buffer + frame->control_offset + 2) + frame->control_offset + 2;
 
     // calculate and write
-    uint16_t fcs = APRS_compute_fcs(frame.buffer, frame.fcs_offset);
-    frame.buffer[frame.fcs_offset] = (fcs >> 8) & 0xFF;  // MSB first
-    frame.buffer[frame.fcs_offset + 1] = fcs & 0xFF;     // LSB
-    frame.buffer[frame.fcs_offset + 2] = AX25_FLAG;
+    uint16_t fcs = APRS_compute_fcs(frame->buffer, frame->fcs_offset);
+    frame->buffer[frame->fcs_offset] = (fcs >> 8) & 0xFF;  // MSB first
+    frame->buffer[frame->fcs_offset + 1] = fcs & 0xFF;     // LSB
+    frame->buffer[frame->fcs_offset + 2] = AX25_FLAG;
 
-    frame.len = frame.fcs_offset + 3;
+    frame->len = frame->fcs_offset + 3;
 
     // increase message count
     if(!is_ack)
         msg_id++;
 }
 
-void APRS_clear(AX25Frame frame) {
-    memset(frame.buffer, 0, APRS_BUFFER_SIZE);
-    frame.len = 0;
-    frame.control_offset = -1;
-    frame.fcs_offset = -1;
+void APRS_clear(AX25Frame* frame) {
+    memset(frame->buffer, 0, APRS_BUFFER_SIZE);
+    frame->len = 0;
+    frame->control_offset = -1;
+    frame->fcs_offset = -1;
 }
 
 #endif
