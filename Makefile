@@ -160,6 +160,7 @@ OBJS += ui/welcome.o
 OBJS += version.o
 OBJS += main.o
 ifeq ($(ENABLE_APRS),1)
+	OBJS += app/ax25.o
 	OBJS += app/aprs.o
 endif
 ifeq ($(ENABLE_MESSENGER),1)

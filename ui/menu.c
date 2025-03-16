@@ -825,8 +825,8 @@ void UI_DisplayMenu(void)
 				{
 					if (!gIsInSubMenu)
 					{	// show placeholder in main menu
-						strncpy(String, gEeprom.APRS_CONFIG.path1, PATH_SIZE);
-						memset(String + PATH_SIZE, 0, 1);
+						strncpy(String, gEeprom.APRS_CONFIG.path1, CALLSIGN_SIZE);
+						memset(String + CALLSIGN_SIZE, 0, 1);
 						UI_PrintString(String, menu_item_x1, menu_item_x2, 2, 8);
 					}
 					else
@@ -839,7 +839,7 @@ void UI_DisplayMenu(void)
 						}
 						else{
 							memset(String, 0, sizeof(String));
-							strncpy(String, gEeprom.APRS_CONFIG.path1, PATH_SIZE);
+							strncpy(String, gEeprom.APRS_CONFIG.path1, CALLSIGN_SIZE);
 							
 							UI_PrintString(String, (menu_item_x1 -2), 0, 2, 8);
 						}			
@@ -852,8 +852,8 @@ void UI_DisplayMenu(void)
 				{
 					if (!gIsInSubMenu)
 					{	// show placeholder in main menu
-						strncpy(String, gEeprom.APRS_CONFIG.path2, PATH_SIZE);
-						memset(String + PATH_SIZE, 0, 1);
+						strncpy(String, gEeprom.APRS_CONFIG.path2, CALLSIGN_SIZE);
+						memset(String + CALLSIGN_SIZE, 0, 1);
 						UI_PrintString(String, menu_item_x1, menu_item_x2, 2, 8);
 					}
 					else
@@ -866,7 +866,7 @@ void UI_DisplayMenu(void)
 						}
 						else{
 							memset(String, 0, sizeof(String));
-							strncpy(String, gEeprom.APRS_CONFIG.path2, PATH_SIZE);
+							strncpy(String, gEeprom.APRS_CONFIG.path2, CALLSIGN_SIZE);
 							
 							UI_PrintString(String, (menu_item_x1 -2), 0, 2, 8);
 						}			

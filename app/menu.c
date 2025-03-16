@@ -526,14 +526,14 @@ void MENU_AcceptSetting(void)
 				gUpdateStatus = true;
 				break;
 			case MENU_APRS_PATH1:
-				memset(gEeprom.APRS_CONFIG.path1, 0, PATH_SIZE);
-				strncpy(gEeprom.APRS_CONFIG.path1, edit, PATH_SIZE);
+				memset(gEeprom.APRS_CONFIG.path1, 0, CALLSIGN_SIZE);
+				strncpy(gEeprom.APRS_CONFIG.path1, edit, CALLSIGN_SIZE);
 				memset(edit, 0, sizeof(edit));
 				gUpdateStatus = true;
 				break;
 			case MENU_APRS_PATH2:
-				memset(gEeprom.APRS_CONFIG.path2, 0, PATH_SIZE);
-				strncpy(gEeprom.APRS_CONFIG.path2, edit, PATH_SIZE);
+				memset(gEeprom.APRS_CONFIG.path2, 0, CALLSIGN_SIZE);
+				strncpy(gEeprom.APRS_CONFIG.path2, edit, CALLSIGN_SIZE);
 				memset(edit, 0, sizeof(edit));
 				gUpdateStatus = true;
 				break;
@@ -1579,7 +1579,7 @@ static void MENU_Key_MENU(const bool bKeyPressed, const bool bKeyHeld)
 			|| UI_MENU_GetCurrentMenuId() == MENU_APRS_SSID
 		)
 		{
-			uint8_t limit = PATH_SIZE;
+			uint8_t limit = CALLSIGN_SIZE;
 			if(UI_MENU_GetCurrentMenuId() == MENU_APRS_CALLSIGN) {
 				limit = CALLSIGN_SIZE; // Path callsigns have one more character
 			} else if (UI_MENU_GetCurrentMenuId() == MENU_APRS_SSID) {
@@ -1803,7 +1803,7 @@ static void MENU_Key_UP_DOWN(bool bKeyPressed, bool bKeyHeld, int8_t Direction)
 					bottom_char = '-';
 					break;
 			}
-			if (bKeyPressed && edit_index < PATH_SIZE && Direction != 0)
+			if (bKeyPressed && edit_index < CALLSIGN_SIZE && Direction != 0)
 			{
 				char         c          = edit[edit_index] + Direction;
 				unsigned int i          = 0;

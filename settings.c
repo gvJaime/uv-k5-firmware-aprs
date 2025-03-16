@@ -311,7 +311,7 @@ void SETTINGS_SavePath_1() {
 	uint8_t buf[8];
 	
 	memset(buf, 0xFF, sizeof(buf));
-	memcpy(buf, gEeprom.APRS_CONFIG.path1, PATH_SIZE);
+	memcpy(buf, gEeprom.APRS_CONFIG.path1, CALLSIGN_SIZE);
 
 	EEPROM_WriteBuffer(0x0F20, buf, true);
 }
@@ -321,7 +321,7 @@ void SETTINGS_SavePath_2() {
 	uint8_t buf[8];
 	
 	memset(buf, 0xFF, sizeof(buf));
-	memcpy(buf, gEeprom.APRS_CONFIG.path2, PATH_SIZE);
+	memcpy(buf, gEeprom.APRS_CONFIG.path2, CALLSIGN_SIZE);
 
 	EEPROM_WriteBuffer(0x0F28, buf, true);
 }

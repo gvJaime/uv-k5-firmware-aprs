@@ -747,12 +747,12 @@ void BOARD_EEPROM_Init(void)
 		EEPROM_ReadBuffer(
 			0x0F20,
 			gEeprom.APRS_CONFIG.path1,
-			PATH_SIZE
+			CALLSIGN_SIZE
 		);
 		EEPROM_ReadBuffer(
 			0x0F28,
 			gEeprom.APRS_CONFIG.path2,
-			PATH_SIZE
+			CALLSIGN_SIZE
 		);
 	#endif
 

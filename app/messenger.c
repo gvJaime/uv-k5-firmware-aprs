@@ -391,9 +391,9 @@ void MSG_SendAck() {
 	// in the future we might reply with received payload and then the sending radio
 	// could compare it and determine if the messegage was read correctly (kamilsss655)
 	#ifdef ENABLE_APRS
-		char origin_callsign[SRC_SIZE + 1];
-		origin_callsign[SRC_SIZE] = 0;
-		strncpy(origin_callsign, ax25frame.buffer + 1 + DEST_SIZE, SRC_SIZE);
+		char origin_callsign[CALLSIGN_SIZE + 1];
+		origin_callsign[CALLSIGN_SIZE] = 0;
+		strncpy(origin_callsign, ax25frame.buffer + 1 + CALLSIGN_SIZE, CALLSIGN_SIZE);
 		MSG_ClearPacketBuffer();
 		APRS_prepare_ack(&ax25frame, ack_id, origin_callsign);
 	#else
@@ -410,12 +410,12 @@ void MSG_SendAck() {
 #ifdef ENABLE_APRS
 	void MSG_DisplayReceived(char * field) {
 		// dump the message onto the display
-		snprintf(field, CALLSIGN_SIZE, "%s", ax25frame.buffer + 1 + DEST_SIZE);
+		snprintf(field, CALLSIGN_SIZE, "%s", ax25frame.buffer + 1 + CALLSIGN_SIZE);
 		snprintf(
 			field + strlen(field), // copy exactly after the source
 			3, // enough to fit a 0 to 15 number and a hyphen
 			"-%d",
-			ax25frame.buffer[1 + DEST_SIZE + SRC_SIZE - 1] && 0xFF // get the last byte of the src
+			ax25frame.buffer[1 + CALLSIGN_SIZE + CALLSIGN_SIZE - 1] && 0xFF // get the last byte of the src
 		);
 		snprintf(
 			field + strlen(field), // copy exactly after the destination
@@ -433,7 +433,7 @@ void MSG_SendAck() {
 
 void MSG_HandleReceive() {
 	#ifdef ENABLE_APRS
-		uint8_t valid = APRS_validate(&ax25frame);
+		uint8_t valid = AX25_validate(&ax25frame);
 		uint8_t send_ack = 0;
 		if(valid && APRS_destined_to_user(&ax25frame)) {
 	#else
@@ -659,7 +659,7 @@ void  MSG_ProcessKeys(KEY_Code_t Key, bool bKeyPressed, bool bKeyHeld) {
 void MSG_ClearPacketBuffer()
 {
 	#ifdef ENABLE_APRS
-		APRS_clear(&ax25frame);
+		AX25_clear(&ax25frame);
 	#else
 		memset(dataPacket.serializedArray, 0, sizeof(dataPacket.serializedArray));
 	#endif
