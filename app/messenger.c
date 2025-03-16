@@ -42,6 +42,7 @@
 #endif
 #ifdef ENABLE_APRS
 	#include "app/aprs.h"
+	#include "app/ax25.h"
 #endif
 
 const uint8_t MSG_BUTTON_STATE_HELD = 1 << 1;
@@ -71,9 +72,7 @@ KeyboardType keyboardType = UPPERCASE;
 
 MsgStatus msgStatus = READY;
 
-#ifdef ENABLE_APRS
-	AX25Frame ax25frame;
-#else
+#ifndef ENABLE_APRS
 	union DataPacket dataPacket;
 #endif
 
@@ -361,6 +360,7 @@ void MSG_StorePacket(const uint16_t interrupt_bits) {
 		BK4819_FskClearFifo();
 		BK4819_FskEnableRx();
 		msgStatus = READY;
+		ax25frame.len = gFSKWriteIndex;
 
 		if (gFSKWriteIndex > 2) {
 			MSG_HandleReceive();

@@ -5,6 +5,8 @@
 
 #include "app/ax25.h"
 
+AX25Frame ax25frame;
+
 int16_t AX25_find_offset(const char *arr, uint16_t arr_length, uint8_t target, uint16_t start_offset) {
     for (uint16_t i = start_offset; i < arr_length; ++i) {
         if (arr[i] == target) {
@@ -54,7 +56,117 @@ uint8_t AX25_check_fcs(AX25Frame *frame) {
     return *fcs_ptr == crc;
 }
 
+void AX25_clear(AX25Frame* frame) {
+    memset(frame->buffer, 0, AX25_IFRAME_MAX_SIZE);
+    frame->len = 0;
+    frame->control_offset = -1;
+    frame->fcs_offset = -1;
+}
+// **Bit Stuffing Function**
+uint16_t AX25_bit_stuff(AX25Frame *frame) {
+    uint16_t out_index = 0;
+    uint8_t bit_count = 0;
+    uint8_t current_byte = 0;
+    uint8_t bit_pos = 0;
+
+    for (uint16_t i = 0; i < frame->len; i++) {
+        uint8_t byte = frame->buffer[i];
+
+        for (uint8_t j = 0; j < 8; j++) {
+            uint8_t bit = (byte >> j) & 1;
+
+            // Insert bit into the output buffer
+            current_byte |= (bit << bit_pos);
+            bit_pos++;
+
+            // Count consecutive ones
+            if (bit) {
+                bit_count++;
+            } else {
+                bit_count = 0;
+            }
+
+            // If 5 consecutive 1s, stuff a 0
+            if (bit_count == 5) {
+                bit_count = 0;
+                if (bit_pos == 8) {
+                    frame->stuff_buffer[out_index++] = current_byte;
+                    current_byte = 0;
+                    bit_pos = 0;
+                }
+                bit_pos++; // Add extra 0
+            }
+
+            if (bit_pos == 8) {
+                frame->stuff_buffer[out_index++] = current_byte;
+                current_byte = 0;
+                bit_pos = 0;
+            }
+        }
+    }
+
+    // Store any remaining bits
+    if (bit_pos > 0) {
+        frame->stuff_buffer[out_index++] = current_byte;
+    }
+
+    return out_index; // Return stuffed size
+}
+
+// **Bit De-stuffing Function**
+// frame length must be defined by now
+uint16_t AX25_bit_unstuff(AX25Frame *frame) {
+    uint16_t out_index = 0;
+    uint8_t bit_count = 0;
+    uint8_t current_byte = 0;
+    uint8_t bit_pos = 0;
+
+    for (uint16_t i = 0; i < frame->len; i++) {
+        uint8_t byte = frame->stuff_buffer[i];
+
+        for (uint8_t j = 0; j < 8; j++) {
+            uint8_t bit = (byte >> j) & 1;
+
+            // Add bit to the current byte
+            current_byte |= (bit << bit_pos);
+            bit_pos++;
+
+            // Count consecutive ones
+            if (bit) {
+                bit_count++;
+            } else {
+                bit_count = 0;
+            }
+
+            // If 5 consecutive 1s, skip next bit (stuffed 0)
+            if (bit_count == 5) {
+                j++; // Skip next bit
+                bit_count = 0;
+            }
+
+            // Store full byte
+            if (bit_pos == 8) {
+                frame->buffer[out_index++] = current_byte;
+                current_byte = 0;
+                bit_pos = 0;
+            }
+        }
+    }
+
+    // Store any remaining bits
+    if (bit_pos > 0) {
+        frame->buffer[out_index++] = current_byte;
+    }
+
+    frame->len = out_index;
+    return out_index; // Return unstuffed size
+}
+
 uint8_t AX25_validate(AX25Frame* frame) {
+    // must be unstuffable
+    if(AX25_bit_unstuff(frame)) {
+        return 0;
+    }
     // must start with correct flag
     if(frame->buffer[0] != AX25_FLAG) {
         frame->len = 0;
@@ -66,19 +178,15 @@ uint8_t AX25_validate(AX25Frame* frame) {
     while(i < AX25_IFRAME_MAX_SIZE && frame->buffer[i] != AX25_FLAG) {
         i++;
     }
+    if(i == AX25_IFRAME_MAX_SIZE) {
+        return 0;
+    }
 
     frame->len = i;
 
     APRS_parse_offsets(frame);
 
     return AX25_check_fcs(frame);
-}
-
-void AX25_clear(AX25Frame* frame) {
-    memset(frame->buffer, 0, AX25_IFRAME_MAX_SIZE);
-    frame->len = 0;
-    frame->control_offset = -1;
-    frame->fcs_offset = -1;
 }
 
 #endif

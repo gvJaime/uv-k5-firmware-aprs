@@ -13,6 +13,7 @@
 #define AX25_FCS_POLY        0x8408  // Reversed polynomial for CRC-16-CCITT
 
 #define AX25_IFRAME_MAX_SIZE 1 + CALLSIGN_SIZE + CALLSIGN_SIZE + DIGI_MAX_SIZE + 1 + 1 + INFO_MAX_SIZE + 2 + 1 + 1 // last one added because it needs to be even
+#define AX25_BITSTUFFED_MAX_SIZE ((AX25_IFRAME_MAX_SIZE * 13) / 10)
 
 
 // you are supposed to lay out the data onto the buffer as it is received,
@@ -29,13 +30,16 @@
 //    uint8_t payload[INFO_MAX_SIZE]; // APRS text payload
 //    uint16_t fcs;        // Frame Check Sequence (CRC)
 //    uint8_t end_flag; // for alignment purposes
-//  } AX25Frame;
+//  } AX25Buffer;
 typedef struct {
     int8_t control_offset;
     int16_t fcs_offset;
     uint16_t len;
     char buffer[AX25_IFRAME_MAX_SIZE];
+    char stuff_buffer[AX25_BITSTUFFED_MAX_SIZE];
 } AX25Frame;
+
+extern AX25Frame ax25frame;
 
 uint16_t AX25_compute_fcs(const char *data, uint16_t len);
 void AX25_set_fcs(AX25Frame *frame);
@@ -43,6 +47,7 @@ uint8_t AX25_check_fcs(AX25Frame *frame);
 uint8_t AX25_validate(AX25Frame* frame);
 void AX25_clear(AX25Frame* frame);
 int16_t AX25_find_offset(const char *arr, uint16_t arr_length, uint8_t target, uint16_t start_offset);
+uint16_t AX25_bit_stuff(AX25Frame *frame);
 
 #endif
 

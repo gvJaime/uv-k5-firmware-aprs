@@ -98,6 +98,8 @@ void APRS_prepare_message(AX25Frame* frame, const char * message, uint8_t is_ack
 
     frame->len = frame->fcs_offset + 3;
 
+    AX25_bit_stuff(frame);
+
     // increase message count
     if(!is_ack)
         msg_id++;
