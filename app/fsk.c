@@ -8,10 +8,18 @@
 #include "functions.h"
 #include "app/fsk.h"
 
+#ifdef ENABLE_APRS
+#define APRS_PREAMBLE 33
+#endif
 
 uint16_t gFSKWriteIndex = 0;
 
 ModemStatus modem_status = READY;
+
+void FSK_disable_tx() {
+	const uint16_t fsk_reg59 = BK4819_ReadRegister(BK4819_REG_59);
+	BK4819_WriteRegister(BK4819_REG_59, ~(1u << 11) & fsk_reg59);
+}
 
 void FSK_configure(uint8_t rx, uint16_t size) {
     uint16_t TONE1_FREQ;
@@ -303,10 +311,21 @@ void FSK_send_data(char * data, uint16_t len) {
 	const uint16_t filt_val = BK4819_ReadRegister(BK4819_REG_2B);
 	BK4819_WriteRegister(BK4819_REG_2B, (1u << 2) | (1u << 0));
 	
-	FSK_configure(false, len);
-
 
 	SYSTEM_DelayMs(100);
+
+    #ifdef ENABLE_APRS
+	    FSK_configure(false, len + APRS_PREAMBLE);
+        SYSTEM_DelayMs(100);
+        {	// load a bunch of 0x7E into the buffer
+            for (uint16_t i = 0; i < APRS_PREAMBLE / 2; i++) {
+                BK4819_WriteRegister(BK4819_REG_5F, 0x7E7E);
+            }
+        }
+    #else
+        FSK_configure(false, len);
+    #endif
+
 
 	{	// load the entire packet data into the TX FIFO buffer
 
@@ -337,6 +356,8 @@ void FSK_send_data(char * data, uint16_t len) {
 	//BK4819_WriteRegister(BK4819_REG_02, 0);
 
 	SYSTEM_DelayMs(100);
+
+    FSK_disable_tx();
 
 	// disable TX
 	FSK_configure(true, len);
