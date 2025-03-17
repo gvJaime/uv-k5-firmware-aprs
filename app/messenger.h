@@ -50,11 +50,6 @@ extern char rxMessage[4][PAYLOAD_LENGTH + 2];
 extern uint8_t hasNewMessage;
 extern uint8_t keyTickCounter;
 
-typedef enum MsgStatus {
-    READY,
-    SENDING,
-    RECEIVING,
-} MsgStatus;
 
 typedef enum PacketType {
     MESSAGE_PACKET = 100u,
@@ -62,13 +57,6 @@ typedef enum PacketType {
     ACK_PACKET,
     INVALID_PACKET
 } PacketType;
-
-// Modem Modulation                             // 2024 kamilsss655
-typedef enum ModemModulation {
-  MOD_FSK_450,   // for bad conditions
-  MOD_FSK_700,   // for medium conditions
-  MOD_AFSK_1200  // for good conditions
-} ModemModulation;
 
 // Data Packet definition                            // 2024 kamilsss655
 union DataPacket
@@ -102,7 +90,6 @@ void MSG_StorePacket(const uint16_t interrupt_bits);
 void MSG_Init();
 void MSG_ProcessKeys(KEY_Code_t Key, bool bKeyPressed, bool bKeyHeld);
 void MSG_SendPacket();
-void MSG_FSKSendData();
 void MSG_ClearPacketBuffer();
 #ifdef ENABLE_APRS
   void MSG_SendAck(uint16_t ack_id);
@@ -113,7 +100,6 @@ void MSG_ClearPacketBuffer();
 #endif
 void MSG_HandleReceive();
 void MSG_Send(const char *cMessage);
-void MSG_ConfigureFSK(bool rx);
 
 #endif
 

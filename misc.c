@@ -212,11 +212,6 @@ uint8_t           gScanDelay_10ms;
 #ifdef ENABLE_AIRCOPY
 	uint8_t       gAircopySendCountdown;
 #endif
-#ifdef ENABLE_APRS
- 	uint16_t           gFSKWriteIndex;
-#else
-	uint8_t           gFSKWriteIndex;
-#endif
 
 #ifdef ENABLE_NOAA
 	bool          gIsNoaaMode;

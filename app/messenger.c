@@ -44,6 +44,7 @@
 	#include "app/aprs.h"
 	#include "app/ax25.h"
 #endif
+#include "app/fsk.h"
 
 const uint8_t MSG_BUTTON_STATE_HELD = 1 << 1;
 
@@ -51,8 +52,6 @@ const uint8_t MSG_BUTTON_EVENT_SHORT =  0;
 const uint8_t MSG_BUTTON_EVENT_LONG =  MSG_BUTTON_STATE_HELD;
 
 const uint8_t MAX_MSG_LENGTH = PAYLOAD_LENGTH - 1;
-
-uint16_t TONE2_FREQ;
 
 #define NEXT_CHAR_DELAY 100 // 10ms tick
 
@@ -70,8 +69,6 @@ unsigned char cIndex = 0;
 unsigned char prevKey = 0, prevLetter = 0;
 KeyboardType keyboardType = UPPERCASE;
 
-MsgStatus msgStatus = READY;
-
 #ifndef ENABLE_APRS
 	union DataPacket dataPacket;
 #endif
@@ -84,106 +81,14 @@ uint8_t keyTickCounter = 0;
 
 // -----------------------------------------------------
 
-void MSG_FSKSendData() {
-
-	// turn off CTCSS/CDCSS during FFSK
-	const uint16_t css_val = BK4819_ReadRegister(BK4819_REG_51);
-	BK4819_WriteRegister(BK4819_REG_51, 0);
-
-	// set the FM deviation level
-	const uint16_t dev_val = BK4819_ReadRegister(BK4819_REG_40);
-
-	{
-		uint16_t deviation;
-		switch (gEeprom.VfoInfo[gEeprom.TX_VFO].CHANNEL_BANDWIDTH)
-		{
-			case BK4819_FILTER_BW_WIDE:            deviation =  1300; break; // 20k // measurements by kamilsss655
-			case BK4819_FILTER_BW_NARROW:          deviation =  1200; break; // 10k
-			// case BK4819_FILTER_BW_NARROWAVIATION:  deviation =  850; break;  // 5k
-			// case BK4819_FILTER_BW_NARROWER:        deviation =  850; break;  // 5k
-			// case BK4819_FILTER_BW_NARROWEST:	      deviation =  850; break;  // 5k
-			default:                               deviation =  850;  break;  // 5k
-		}
-
-		//BK4819_WriteRegister(0x40, (3u << 12) | (deviation & 0xfff));
-		BK4819_WriteRegister(BK4819_REG_40, (dev_val & 0xf000) | (deviation & 0xfff));
-	}
-
-	// REG_2B   0
-	//
-	// <15> 1 Enable CTCSS/CDCSS DC cancellation after FM Demodulation   1 = enable 0 = disable
-	// <14> 1 Enable AF DC cancellation after FM Demodulation            1 = enable 0 = disable
-	// <10> 0 AF RX HPF 300Hz filter     0 = enable 1 = disable
-	// <9>  0 AF RX LPF 3kHz filter      0 = enable 1 = disable
-	// <8>  0 AF RX de-emphasis filter   0 = enable 1 = disable
-	// <2>  0 AF TX HPF 300Hz filter     0 = enable 1 = disable
-	// <1>  0 AF TX LPF filter           0 = enable 1 = disable
-	// <0>  0 AF TX pre-emphasis filter  0 = enable 1 = disable
-	//
-	// disable the 300Hz HPF and FM pre-emphasis filter
-	//
-	const uint16_t filt_val = BK4819_ReadRegister(BK4819_REG_2B);
-	BK4819_WriteRegister(BK4819_REG_2B, (1u << 2) | (1u << 0));
-	
-	MSG_ConfigureFSK(false);
-
-
-
-	SYSTEM_DelayMs(100);
-
-	{	// load the entire packet data into the TX FIFO buffer
-		#ifdef ENABLE_APRS
-		for (size_t i = 0, j = 0; i < ax25frame.len; i += 2, j++) {
-        	BK4819_WriteRegister(BK4819_REG_5F, (ax25frame.buffer[i + 1] << 8) | ax25frame.buffer[i]);
-    	}
-		#else
-		for (size_t i = 0, j = 0; i < sizeof(dataPacket.serializedArray); i += 2, j++) {
-        	BK4819_WriteRegister(BK4819_REG_5F, (dataPacket.serializedArray[i + 1] << 8) | dataPacket.serializedArray[i]);
-    	}
-		#endif
-	}
-
-	// enable FSK TX
-	BK4819_FskEnableTx();
-
-	{
-		// allow up to 310ms for the TX to complete
-		// if it takes any longer then somethings gone wrong, we shut the TX down
-		unsigned int timeout = 1000 / 5;
-
-		while (timeout-- > 0)
-		{
-			SYSTEM_DelayMs(5);
-			if (BK4819_ReadRegister(BK4819_REG_0C) & (1u << 0))
-			{	// we have interrupt flags
-				BK4819_WriteRegister(BK4819_REG_02, 0);
-				if (BK4819_ReadRegister(BK4819_REG_02) & BK4819_REG_02_FSK_TX_FINISHED)
-					timeout = 0;       // TX is complete
-			}
-		}
-	}
-	//BK4819_WriteRegister(BK4819_REG_02, 0);
-
-	SYSTEM_DelayMs(100);
-
-	// disable TX
-	MSG_ConfigureFSK(true);
-
-	// restore FM deviation level
-	BK4819_WriteRegister(BK4819_REG_40, dev_val);
-
-	// restore TX/RX filtering
-	BK4819_WriteRegister(BK4819_REG_2B, filt_val);
-
-	// restore the CTCSS/CDCSS setting
-	BK4819_WriteRegister(BK4819_REG_51, css_val);
-
-}
-
 void MSG_EnableRX(const bool enable) {
 
 	if (enable) {
-		MSG_ConfigureFSK(true);
+		#ifdef ENABLE_APRS
+			FSK_configure(true, AX25_BITSTUFFED_MAX_SIZE);
+		#else
+			FSK_configure(true, sizeof(dataPacket.serializedArray));
+		#endif
 
 		if(gEeprom.MESSENGER_CONFIG.data.receive)
 			BK4819_FskEnableRx();
@@ -208,7 +113,7 @@ void moveUP(char (*rxMessages)[PAYLOAD_LENGTH + 2]) {
 
 void MSG_SendPacket() {
 
-	if ( msgStatus != READY ) return;
+	if ( modem_status != READY ) return;
 
 	#ifdef ENABLE_APRS
 		if ( ax25frame.len > 0) { // in the aprs implementation this function is expected to be called after checks
@@ -223,11 +128,6 @@ void MSG_SendPacket() {
 			return;
 		}
 
-		msgStatus = SENDING;
-
-		RADIO_SetVfoState(VFO_STATE_NORMAL);
-		BK4819_ToggleGpioOut(BK4819_GPIO6_PIN2_GREEN, false);
-		BK4819_ToggleGpioOut(BK4819_GPIO5_PIN1_RED, true);
 
 		// display sent message (before encryption)
 		#ifdef ENABLE_APRS
@@ -269,34 +169,11 @@ void MSG_SendPacket() {
 			}
 		#endif
 
-		BK4819_DisableDTMF();
-
-		// mute the mic during TX
-		gMuteMic = true;
-
-		SYSTEM_DelayMs(50);
-
-		MSG_FSKSendData();
-
-		SYSTEM_DelayMs(50);
-
-		APP_EndTransmission(false);
-		// this must be run after end of TX, otherwise radio will still TX transmit without even RED LED on
-		FUNCTION_Select(FUNCTION_FOREGROUND);
-
-		RADIO_SetVfoState(VFO_STATE_NORMAL);
-
-		// disable mic mute after TX
-		gMuteMic = false;
-
-		BK4819_ToggleGpioOut(BK4819_GPIO5_PIN1_RED, false);
-
-		MSG_EnableRX(true);
-
-		// clear packet buffer
-		MSG_ClearPacketBuffer();
-
-		msgStatus = READY;
+		#ifdef ENABLE_APRS
+			FSK_send_data(ax25frame.stuff_buffer, ax25frame.len);
+		#else
+			FSK_send_data(dataPacket.serializedArray, sizeof(dataPacket.serializedArray));
+		#endif
 
 	} else {
 		AUDIO_PlayBeep(BEEP_500HZ_60MS_DOUBLE_BEEP_OPTIONAL);
@@ -329,10 +206,10 @@ void MSG_StorePacket(const uint16_t interrupt_bits) {
 		#endif
 		gFSKWriteIndex = 0;
 		MSG_ClearPacketBuffer();
-		msgStatus = RECEIVING;
+		modem_status = RECEIVING;
 	}
 
-	if (rx_fifo_almost_full && msgStatus == RECEIVING) {
+	if (rx_fifo_almost_full && modem_status == RECEIVING) {
 
 		const uint16_t count = BK4819_ReadRegister(BK4819_REG_5E) & (7u << 0);  // almost full threshold
 		for (uint16_t i = 0; i < count; i++) {
@@ -359,7 +236,7 @@ void MSG_StorePacket(const uint16_t interrupt_bits) {
 		BK4819_ToggleGpioOut(BK4819_GPIO6_PIN2_GREEN, 0);
 		BK4819_FskClearFifo();
 		BK4819_FskEnableRx();
-		msgStatus = READY;
+		modem_status = READY;
 		ax25frame.len = gFSKWriteIndex;
 
 		if (gFSKWriteIndex > 2) {
@@ -374,7 +251,7 @@ void MSG_Init() {
 	memset(cMessage, 0, sizeof(cMessage));
 	memset(lastcMessage, 0, sizeof(lastcMessage));
 	hasNewMessage = 0;
-	msgStatus = READY;
+	modem_status = READY;
 	prevKey = 0;
     prevLetter = 0;
 	cIndex = 0;
@@ -686,336 +563,5 @@ void MSG_Send(const char *cMessage){
 	MSG_SendPacket();
 }
 
-#ifdef ENABLE_APRS
-void MSG_ConfigureFSK(bool rx)
-{
-	// REG_70
-	//
-	// <15>   0 Enable TONE1
-	//        1 = Enable
-	//        0 = Disable
-	//
-	// <14:8> 0 TONE1 tuning gain
-	//        0 ~ 127
-	//
-	// <7>    0 Enable TONE2
-	//        1 = Enable
-	//        0 = Disable
-	//
-	// <6:0>  0 TONE2/FSK tuning gain
-	//        0 ~ 127
-	//
-	BK4819_WriteRegister(BK4819_REG_70,
-		( 0u << 15) |    // 0
-		( 0u <<  8) |    // 0
-		( 1u <<  7) |    // 1
-		(96u <<  0));    // 96
-
-	// Tone2 = FSK baudrate                       // kamilsss655 2024
-	
-	TONE2_FREQ = 0x3065;
-
-	BK4819_WriteRegister(BK4819_REG_72, TONE2_FREQ);
-	
-	BK4819_WriteRegister(BK4819_REG_58,
-		(3u << 13) |		// 1 FSK TX mode selection
-							//   0 = FSK 1.2K and FSK 2.4K TX .. no tones, direct FM
-							//   1 = FFSK 1200 / 1800 TX
-							//   2 = ???
-							//   3 = FFSK 1200 / 2400 TX
-							//   4 = ???
-							//   5 = NOAA SAME TX
-							//   6 = ???
-							//   7 = ???
-							//
-		(4u << 10) |		// 0 FSK RX mode selection
-							//   0 = FSK 1.2K, FSK 2.4K RX and NOAA SAME RX .. no tones, direct FM
-							//   1 = ???
-							//   2 = ???
-							//   3 = ???
-							//   4 = FFSK 1200 / 2400 RX
-							//   5 = ???
-							//   6 = ???
-							//   7 = FFSK 1200 / 1800 RX
-							//
-		(3u << 8) |			// 0 FSK RX gain
-							//   0 ~ 3
-							//
-		(0u << 6) |			// 0 ???
-							//   0 ~ 3
-							//
-		(0u << 4) |			// 0 FSK preamble type selection
-							//   0 = 0xAA or 0x55 due to the MSB of FSK sync byte 0
-							//   1 = ???
-							//   2 = 0x55
-							//   3 = 0xAA
-							//
-		(4u << 1) |			// 1 FSK RX bandwidth setting
-							//   0 = FSK 1.2K .. no tones, direct FM
-							//   1 = FFSK 1200 / 1800
-							//   2 = NOAA SAME RX
-							//   3 = ???
-							//   4 = FSK 2.4K and FFSK 1200 / 2400
-							//   5 = ???
-							//   6 = ???
-							//   7 = ???
-							//
-		(1u << 0));			// 1 FSK enable
-							//   0 = disable
-							//   1 = enable
-
-	// REG_5A .. bytes 0 & 1 sync pattern
-	//
-	// <15:8> sync byte 0
-	// < 7:0> sync byte 1
-	BK4819_WriteRegister(BK4819_REG_5A, 0x7E7E);
-
-	// REG_5B .. bytes 2 & 3 sync pattern
-	//
-	// <15:8> sync byte 2
-	// < 7:0> sync byte 3
-	BK4819_WriteRegister(BK4819_REG_5B, 0x7E7E);
-
-	// disable CRC
-	//BK4819_WriteRegister(BK4819_REG_5C, 0x5625);
-
-	// set the almost full threshold
-	if(rx)
-		BK4819_WriteRegister(BK4819_REG_5E, (64u << 3) | (1u << 0));  // 0 ~ 127, 0 ~ 7
-
-	// packet size .. sync + packet - size of a single packet
-
-	#ifdef ENABLE_APRS // this is possibly going to be too big.
-		uint16_t size = sizeof(ax25frame.stuff);
-	#else
-		uint16_t size = sizeof(dataPacket.serializedArray);
-	#endif
-	// size -= (fsk_reg59 & (1u << 3)) ? 4 : 2;
-	if(rx)
-		size = (((size + 1) / 2) * 2) + 2;             // round up to even, else FSK RX doesn't work
-
-	BK4819_WriteRegister(BK4819_REG_5D, (size << 8));
-	// BK4819_WriteRegister(BK4819_REG_5D, ((sizeof(dataPacket.serializedArray)) << 8));
-
-	// clear FIFO's
-	BK4819_FskClearFifo();
-
-	// configure main FSK params
-	BK4819_WriteRegister(BK4819_REG_59,
-				(0u        <<       15) |   // 0/1     1 = clear TX FIFO
-				(0u        <<       14) |   // 0/1     1 = clear RX FIFO
-				(0u        <<       13) |   // 0/1     1 = scramble
-				(0u        <<       12) |   // 0/1     1 = enable RX
-				(0u        <<       11) |   // 0/1     1 = enable TX
-				(0u        <<       10) |   // 0/1     1 = invert data when RX
-				(0u        <<        9) |   // 0/1     1 = invert data when TX
-				(0u        <<        8) |   // 0/1     ???
-				((rx ? 0u : 15u) <<  4) |   // 0 ~ 15  preamble length .. bit toggling
-				(1u        <<        3) |   // 0/1     sync length
-				(0u        <<        0)     // 0 ~ 7   ???
-				
-	);
-
-	// clear interupts
-	BK4819_WriteRegister(BK4819_REG_02, 0);
-}
-#else
-void MSG_ConfigureFSK(bool rx)
-{
-	// REG_70
-	//
-	// <15>   0 Enable TONE1
-	//        1 = Enable
-	//        0 = Disable
-	//
-	// <14:8> 0 TONE1 tuning gain
-	//        0 ~ 127
-	//
-	// <7>    0 Enable TONE2
-	//        1 = Enable
-	//        0 = Disable
-	//
-	// <6:0>  0 TONE2/FSK tuning gain
-	//        0 ~ 127
-	//
-	BK4819_WriteRegister(BK4819_REG_70,
-		( 0u << 15) |    // 0
-		( 0u <<  8) |    // 0
-		( 1u <<  7) |    // 1
-		(96u <<  0));    // 96
-
-	// Tone2 = FSK baudrate                       // kamilsss655 2024
-	switch(gEeprom.MESSENGER_CONFIG.data.modulation)
-	{
-		case MOD_AFSK_1200:
-			TONE2_FREQ = 12389u;
-			break;
-		case MOD_FSK_700:
-			TONE2_FREQ = 7227u;
-			break;
-		case MOD_FSK_450:
-			TONE2_FREQ = 4646u;
-			break;
-	}
-
-	BK4819_WriteRegister(BK4819_REG_72, TONE2_FREQ);
-	
-	switch(gEeprom.MESSENGER_CONFIG.data.modulation)
-	{
-		case MOD_FSK_700:
-		case MOD_FSK_450:
-			BK4819_WriteRegister(BK4819_REG_58,
-				(0u << 13) |		// 1 FSK TX mode selection
-									//   0 = FSK 1.2K and FSK 2.4K TX .. no tones, direct FM
-									//   1 = FFSK 1200 / 1800 TX
-									//   2 = ???
-									//   3 = FFSK 1200 / 2400 TX
-									//   4 = ???
-									//   5 = NOAA SAME TX
-									//   6 = ???
-									//   7 = ???
-									//
-				(0u << 10) |		// 0 FSK RX mode selection
-									//   0 = FSK 1.2K, FSK 2.4K RX and NOAA SAME RX .. no tones, direct FM
-									//   1 = ???
-									//   2 = ???
-									//   3 = ???
-									//   4 = FFSK 1200 / 2400 RX
-									//   5 = ???
-									//   6 = ???
-									//   7 = FFSK 1200 / 1800 RX
-									//
-				(3u << 8) |			// 0 FSK RX gain
-									//   0 ~ 3
-									//
-				(0u << 6) |			// 0 ???
-									//   0 ~ 3
-									//
-				(0u << 4) |			// 0 FSK preamble type selection
-									//   0 = 0xAA or 0x55 due to the MSB of FSK sync byte 0
-									//   1 = ???
-									//   2 = 0x55
-									//   3 = 0xAA
-									//
-				(0u << 1) |			// 1 FSK RX bandwidth setting
-									//   0 = FSK 1.2K .. no tones, direct FM
-									//   1 = FFSK 1200 / 1800
-									//   2 = NOAA SAME RX
-									//   3 = ???
-									//   4 = FSK 2.4K and FFSK 1200 / 2400
-									//   5 = ???
-									//   6 = ???
-									//   7 = ???
-									//
-				(1u << 0));			// 1 FSK enable
-									//   0 = disable
-									//   1 = enable
-		break;
-		case MOD_AFSK_1200:
-			BK4819_WriteRegister(BK4819_REG_58,
-				(1u << 13) |		// 1 FSK TX mode selection
-									//   0 = FSK 1.2K and FSK 2.4K TX .. no tones, direct FM
-									//   1 = FFSK 1200 / 1800 TX
-									//   2 = ???
-									//   3 = FFSK 1200 / 2400 TX
-									//   4 = ???
-									//   5 = NOAA SAME TX
-									//   6 = ???
-									//   7 = ???
-									//
-				(7u << 10) |		// 0 FSK RX mode selection
-									//   0 = FSK 1.2K, FSK 2.4K RX and NOAA SAME RX .. no tones, direct FM
-									//   1 = ???
-									//   2 = ???
-									//   3 = ???
-									//   4 = FFSK 1200 / 2400 RX
-									//   5 = ???
-									//   6 = ???
-									//   7 = FFSK 1200 / 1800 RX
-									//
-				(3u << 8) |			// 0 FSK RX gain
-									//   0 ~ 3
-									//
-				(0u << 6) |			// 0 ???
-									//   0 ~ 3
-									//
-				(0u << 4) |			// 0 FSK preamble type selection
-									//   0 = 0xAA or 0x55 due to the MSB of FSK sync byte 0
-									//   1 = ???
-									//   2 = 0x55
-									//   3 = 0xAA
-									//
-				(1u << 1) |			// 1 FSK RX bandwidth setting
-									//   0 = FSK 1.2K .. no tones, direct FM
-									//   1 = FFSK 1200 / 1800
-									//   2 = NOAA SAME RX
-									//   3 = ???
-									//   4 = FSK 2.4K and FFSK 1200 / 2400
-									//   5 = ???
-									//   6 = ???
-									//   7 = ???
-									//
-				(1u << 0));			// 1 FSK enable
-									//   0 = disable
-									//   1 = enable
-		break;
-	}
-
-	// REG_5A .. bytes 0 & 1 sync pattern
-	//
-	// <15:8> sync byte 0
-	// < 7:0> sync byte 1
-	BK4819_WriteRegister(BK4819_REG_5A, 0x3072);
-
-	// REG_5B .. bytes 2 & 3 sync pattern
-	//
-	// <15:8> sync byte 2
-	// < 7:0> sync byte 3
-	BK4819_WriteRegister(BK4819_REG_5B, 0x576C);
-
-	// disable CRC
-	BK4819_WriteRegister(BK4819_REG_5C, 0x5625);
-
-	// set the almost full threshold
-	if(rx)
-		BK4819_WriteRegister(BK4819_REG_5E, (64u << 3) | (1u << 0));  // 0 ~ 127, 0 ~ 7
-
-	// packet size .. sync + packet - size of a single packet
-
-	#ifdef ENABLE_APRS // this is possibly going to be too big.
-		uint16_t size = sizeof(ax25frame.buffer);
-	#else
-		uint16_t size = sizeof(dataPacket.serializedArray);
-	#endif
-	// size -= (fsk_reg59 & (1u << 3)) ? 4 : 2;
-	if(rx)
-		size = (((size + 1) / 2) * 2) + 2;             // round up to even, else FSK RX doesn't work
-
-	BK4819_WriteRegister(BK4819_REG_5D, (size << 8));
-	// BK4819_WriteRegister(BK4819_REG_5D, ((sizeof(dataPacket.serializedArray)) << 8));
-
-	// clear FIFO's
-	BK4819_FskClearFifo();
-
-	// configure main FSK params
-	BK4819_WriteRegister(BK4819_REG_59,
-				(0u        <<       15) |   // 0/1     1 = clear TX FIFO
-				(0u        <<       14) |   // 0/1     1 = clear RX FIFO
-				(0u        <<       13) |   // 0/1     1 = scramble
-				(0u        <<       12) |   // 0/1     1 = enable RX
-				(0u        <<       11) |   // 0/1     1 = enable TX
-				(0u        <<       10) |   // 0/1     1 = invert data when RX
-				(0u        <<        9) |   // 0/1     1 = invert data when TX
-				(0u        <<        8) |   // 0/1     ???
-				((rx ? 0u : 15u) <<  4) |   // 0 ~ 15  preamble length .. bit toggling
-				(1u        <<        3) |   // 0/1     sync length
-				(0u        <<        0)     // 0 ~ 7   ???
-				
-	);
-
-	// clear interupts
-	BK4819_WriteRegister(BK4819_REG_02, 0);
-}
-#endif
 
 #endif
