@@ -8,13 +8,14 @@
 #include "functions.h"
 #include "app/fsk.h"
 
-uint16_t TONE2_FREQ;
 
 uint16_t gFSKWriteIndex = 0;
 
 ModemStatus modem_status = READY;
 
 void FSK_configure(uint8_t rx, uint16_t size) {
+    uint16_t TONE1_FREQ;
+    uint16_t TONE2_FREQ;
     // REG_70
     //
     // <15>   0 Enable TONE1
@@ -31,16 +32,10 @@ void FSK_configure(uint8_t rx, uint16_t size) {
     // <6:0>  0 TONE2/FSK tuning gain
     //        0 ~ 127
     //
-    BK4819_WriteRegister(BK4819_REG_70,
-        ( 0u << 15) |    // 0
-        ( 0u <<  8) |    // 0
-        ( 1u <<  7) |    // 1
-        (96u <<  0));    // 96
-
-    // Tone2 = FSK baudrate                       // kamilsss655 2024
     switch(gEeprom.MESSENGER_CONFIG.data.modulation)
     {
         case MOD_AFSK_1200:
+            TONE1_FREQ = 22714u;
             TONE2_FREQ = 12389u;
             break;
         case MOD_FSK_700:
@@ -51,7 +46,32 @@ void FSK_configure(uint8_t rx, uint16_t size) {
             break;
     }
 
-    BK4819_WriteRegister(BK4819_REG_72, TONE2_FREQ);
+    switch(gEeprom.MESSENGER_CONFIG.data.modulation)
+    {
+        case MOD_AFSK_1200:
+            BK4819_WriteRegister(BK4819_REG_70,
+                ( 1u << 15) |    // 1 // APRS uses both tones
+                ( 0u <<  8) |    // 0
+                ( 1u <<  7) |    // 1
+                (96u <<  0));    // 96
+
+            // TONE 1
+            BK4819_WriteRegister(BK4819_REG_71, TONE1_FREQ);
+            // TONE 2
+            BK4819_WriteRegister(BK4819_REG_72, TONE2_FREQ);
+            break;
+        default:
+            BK4819_WriteRegister(BK4819_REG_70,
+                ( 0u << 15) |    // 0
+                ( 0u <<  8) |    // 0
+                ( 1u <<  7) |    // 1
+                (96u <<  0));    // 96
+
+            // TONE 2 only
+            BK4819_WriteRegister(BK4819_REG_72, TONE2_FREQ);
+            break;
+    }
+
     
     switch(gEeprom.MESSENGER_CONFIG.data.modulation)
     {
@@ -106,7 +126,7 @@ void FSK_configure(uint8_t rx, uint16_t size) {
         break;
         case MOD_AFSK_1200:
             BK4819_WriteRegister(BK4819_REG_58,
-                (3u << 13) |		// 1 FSK TX mode selection
+                (1u << 13) |		// 1 FSK TX mode selection
                                     //   0 = FSK 1.2K and FSK 2.4K TX .. no tones, direct FM
                                     //   1 = FFSK 1200 / 1800 TX
                                     //   2 = ???
@@ -116,7 +136,7 @@ void FSK_configure(uint8_t rx, uint16_t size) {
                                     //   6 = ???
                                     //   7 = ???
                                     //
-                (4u << 10) |		// 0 FSK RX mode selection
+                (7u << 10) |		// 0 FSK RX mode selection
                                     //   0 = FSK 1.2K, FSK 2.4K RX and NOAA SAME RX .. no tones, direct FM
                                     //   1 = ???
                                     //   2 = ???
