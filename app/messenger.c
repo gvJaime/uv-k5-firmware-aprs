@@ -290,7 +290,7 @@ void MSG_SendAck() {
 		snprintf(field, CALLSIGN_SIZE, "%s", ax25frame.buffer + 1 + CALLSIGN_SIZE);
 		snprintf(
 			field + strlen(field), // copy exactly after the source
-			3, // enough to fit a 0 to 15 number and a hyphen
+			4, // enough to fit a 0 to 15 number and a hyphen, plus one for the 0 termination
 			"-%d",
 			ax25frame.buffer[1 + CALLSIGN_SIZE + CALLSIGN_SIZE - 1] && 0xFF // get the last byte of the src
 		);

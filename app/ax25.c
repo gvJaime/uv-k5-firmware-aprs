@@ -58,6 +58,7 @@ uint8_t AX25_check_fcs(AX25Frame *frame) {
 
 void AX25_clear(AX25Frame* frame) {
     memset(frame->buffer, 0, AX25_IFRAME_MAX_SIZE);
+    memset(frame->stuff_buffer, 0, AX25_BITSTUFFED_MAX_SIZE);
     frame->len = 0;
     frame->control_offset = -1;
     frame->fcs_offset = -1;

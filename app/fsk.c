@@ -205,8 +205,29 @@ void FSK_configure(uint8_t rx, uint16_t size) {
     // clear FIFO's
     BK4819_FskClearFifo();
 
+
     // configure main FSK params
-    BK4819_WriteRegister(BK4819_REG_59,
+
+    switch(gEeprom.MESSENGER_CONFIG.data.modulation)
+    {
+        case MOD_AFSK_1200:
+            BK4819_WriteRegister(BK4819_REG_59,
+                (0u        <<       15) |   // 0/1     1 = clear TX FIFO
+                (0u        <<       14) |   // 0/1     1 = clear RX FIFO
+                (0u        <<       13) |   // 0/1     1 = scramble
+                (0u        <<       12) |   // 0/1     1 = enable RX
+                (0u        <<       11) |   // 0/1     1 = enable TX
+                (0u        <<       10) |   // 0/1     1 = invert data when RX
+                (0u        <<        9) |   // 0/1     1 = invert data when TX
+                (0u        <<        8) |   // 0/1     ???
+                (0u        <<        4) |   // 0 ~ 15  preamble length .. bit toggling
+                (0u        <<        3) |   // 0/1     sync length
+                (0u        <<        0)     // 0 ~ 7   ???
+            );
+            break;
+        case MOD_FSK_700:
+        case MOD_FSK_450:
+            BK4819_WriteRegister(BK4819_REG_59,
                 (0u        <<       15) |   // 0/1     1 = clear TX FIFO
                 (0u        <<       14) |   // 0/1     1 = clear RX FIFO
                 (0u        <<       13) |   // 0/1     1 = scramble
@@ -218,8 +239,10 @@ void FSK_configure(uint8_t rx, uint16_t size) {
                 ((rx ? 0u : 15u) <<  4) |   // 0 ~ 15  preamble length .. bit toggling
                 (0u        <<        3) |   // 0/1     sync length
                 (0u        <<        0)     // 0 ~ 7   ???
-                
-    );
+            );
+            break;
+    }
+
 
     // clear interupts
     BK4819_WriteRegister(BK4819_REG_02, 0);
