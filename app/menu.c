@@ -514,8 +514,8 @@ void MENU_AcceptSetting(void)
 
 		#ifdef ENABLE_APRS
 			case MENU_APRS_CALLSIGN:
-				memset(gEeprom.APRS_CONFIG.callsign, 0, CALLSIGN_SIZE);
-				strncpy(gEeprom.APRS_CONFIG.callsign, edit, CALLSIGN_SIZE);
+				memset(gEeprom.APRS_CONFIG.callsign, 0, CALLSIGN_SIZE - 1);
+				strncpy(gEeprom.APRS_CONFIG.callsign, edit, CALLSIGN_SIZE - 1);
 				memset(edit, 0, sizeof(edit));
 				gUpdateStatus = true;
 				break;
@@ -1581,7 +1581,7 @@ static void MENU_Key_MENU(const bool bKeyPressed, const bool bKeyHeld)
 		{
 			uint8_t limit = CALLSIGN_SIZE;
 			if(UI_MENU_GetCurrentMenuId() == MENU_APRS_CALLSIGN) {
-				limit = CALLSIGN_SIZE; // Path callsigns have one more character
+				limit = CALLSIGN_SIZE-1; // Callsign is estabilshed without SSID
 			} else if (UI_MENU_GetCurrentMenuId() == MENU_APRS_SSID) {
 				limit = 2; // SSID will be 2 characters, strictly numeric
 			}
@@ -1787,23 +1787,27 @@ static void MENU_Key_UP_DOWN(bool bKeyPressed, bool bKeyHeld, int8_t Direction)
 		#ifdef ENABLE_APRS
 			char top_char;
 			char bottom_char;
+			uint8_t field_size;
 			const char   unwanted[] = "./:;<=>?@";
 			switch(UI_MENU_GetCurrentMenuId()) {
 				case MENU_APRS_SSID:
 					top_char = '9';
 					bottom_char = '0';
+					field_size = 2;
 					break;
 				case MENU_APRS_CALLSIGN:
 					top_char = 'Z';
 					bottom_char = '0';
+					field_size = CALLSIGN_SIZE - 1;
 					break;
 				default:
 					// then it's path. Allow hyphens
 					top_char = 'Z';
 					bottom_char = '-';
+					field_size = CALLSIGN_SIZE;
 					break;
 			}
-			if (bKeyPressed && edit_index < CALLSIGN_SIZE && Direction != 0)
+			if (bKeyPressed && edit_index < field_size && Direction != 0)
 			{
 				char         c          = edit[edit_index] + Direction;
 				unsigned int i          = 0;

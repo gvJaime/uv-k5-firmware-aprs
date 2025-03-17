@@ -713,7 +713,7 @@ void MSG_ConfigureFSK(bool rx)
 
 	// Tone2 = FSK baudrate                       // kamilsss655 2024
 	
-	TONE2_FREQ = 12389u;
+	TONE2_FREQ = 0x3065;
 
 	BK4819_WriteRegister(BK4819_REG_72, TONE2_FREQ);
 	
@@ -768,16 +768,16 @@ void MSG_ConfigureFSK(bool rx)
 	//
 	// <15:8> sync byte 0
 	// < 7:0> sync byte 1
-	BK4819_WriteRegister(BK4819_REG_5A, 0x3072);
+	BK4819_WriteRegister(BK4819_REG_5A, 0x7E7E);
 
 	// REG_5B .. bytes 2 & 3 sync pattern
 	//
 	// <15:8> sync byte 2
 	// < 7:0> sync byte 3
-	BK4819_WriteRegister(BK4819_REG_5B, 0x576C);
+	BK4819_WriteRegister(BK4819_REG_5B, 0x7E7E);
 
 	// disable CRC
-	BK4819_WriteRegister(BK4819_REG_5C, 0x5625);
+	//BK4819_WriteRegister(BK4819_REG_5C, 0x5625);
 
 	// set the almost full threshold
 	if(rx)
@@ -786,7 +786,7 @@ void MSG_ConfigureFSK(bool rx)
 	// packet size .. sync + packet - size of a single packet
 
 	#ifdef ENABLE_APRS // this is possibly going to be too big.
-		uint16_t size = sizeof(ax25frame.buffer);
+		uint16_t size = sizeof(ax25frame.stuff);
 	#else
 		uint16_t size = sizeof(dataPacket.serializedArray);
 	#endif
