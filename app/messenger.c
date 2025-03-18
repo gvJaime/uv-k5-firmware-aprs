@@ -536,7 +536,7 @@ void  MSG_ProcessKeys(KEY_Code_t Key, bool bKeyPressed, bool bKeyHeld) {
 void MSG_ClearPacketBuffer()
 {
 	#ifdef ENABLE_APRS
-		AX25_clear(&ax25frame);
+		AX25_clear_old(&ax25frame);
 	#else
 		memset(dataPacket.serializedArray, 0, sizeof(dataPacket.serializedArray));
 	#endif
