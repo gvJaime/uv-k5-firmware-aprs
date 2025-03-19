@@ -164,10 +164,12 @@ void MSG_Init() {
 	memset(cMessage, 0, sizeof(cMessage));
 	memset(lastcMessage, 0, sizeof(lastcMessage));
 	hasNewMessage = 0;
-	modem_status = READY;
 	prevKey = 0;
     prevLetter = 0;
 	cIndex = 0;
+
+	FSK_init(&MSG_HandleReceive);
+
 	#ifdef ENABLE_ENCRYPTION
 		gRecalculateEncKey = true;
 	#endif
@@ -217,14 +219,19 @@ void MSG_SendAck() {
 	}
 #endif
 
-void MSG_HandleReceive() {
+void MSG_HandleReceive(uint8_t * receive_buffer) {
+	uint8_t valid;
+
 	#ifdef ENABLE_APRS
-		uint8_t valid = AX25_validate(&ax25frame);
+		valid = AX25_validate(&ax25frame);
 		uint8_t send_ack = 0;
 		if(valid && APRS_destined_to_user(&ax25frame)) {
 	#else
-		if (NUNU_is_valid(&dataPacket)) {
+		valid = NUNU_parse(&dataPacket, receive_buffer);
+		valid = NUNU_is_valid(&dataPacket);
 	#endif
+
+	if(!valid) {
 		snprintf(rxMessage[3], PAYLOAD_LENGTH + 2, "ERROR: INVALID PACKET.");
 	} else {
 		moveUP(rxMessage);
@@ -264,18 +271,18 @@ void MSG_HandleReceive() {
 				#endif
 			#endif
 			#ifdef ENABLE_MESSENGER_UART
-			#ifdef ENABLE_APRS
-				uint8_t buf[PAYLOAD_LENGTH + 8];
-				snprintf(
-					buf,
-					ax25frame.fcs_offset - ax25frame.control_offset,
-					"APRS<%s\r\n",
-					ax25frame.buffer + ax25frame.control_offset + 1
-				);
-				UART_Send(buf, sizeof(buf));
-			#else
-				UART_printf("SMS<%s\r\n", dataPacket.data.payload);
-			#endif
+				#ifdef ENABLE_APRS
+					uint8_t buf[PAYLOAD_LENGTH + 8];
+					snprintf(
+						buf,
+						ax25frame.fcs_offset - ax25frame.control_offset,
+						"APRS<%s\r\n",
+						ax25frame.buffer + ax25frame.control_offset + 1
+					);
+					UART_Send(buf, sizeof(buf));
+				#else
+					UART_printf("SMS<%s\r\n", dataPacket.data.payload);
+				#endif
 			#endif
 		}
 

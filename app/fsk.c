@@ -13,7 +13,14 @@ uint16_t gFSKWriteIndex = 0;
 
 uint8_t transit_buffer[512];
 
+void (*FSK_receive_callback)(uint8_t*);
+
 ModemStatus modem_status = READY;
+
+void FSK_init(void (*receive_callback)(uint8_t*) ) {
+    modem_status = READY;
+    FSK_receive_callback = receive_callback; 
+}
 
 void FSK_enable_rx(const bool enable) {
 
@@ -77,11 +84,10 @@ void FSK_store_packet_interrupt(const uint16_t interrupt_bits) {
 		BK4819_FskEnableRx();
 		modem_status = READY;
 
-        if(receive_callback)
-            receive_callback();
 
 		if (gFSKWriteIndex > 2) {
-			MSG_HandleReceive();
+            if(FSK_receive_callback)
+                FSK_receive_callback(transit_buffer);
 		}
 		gFSKWriteIndex = 0;
 	}

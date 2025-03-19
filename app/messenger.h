@@ -65,7 +65,7 @@ void MSG_ClearPacketBuffer();
 #else
   void MSG_SendAck();
 #endif
-void MSG_HandleReceive();
+void MSG_HandleReceive(uint8_t * receive_buffer);
 void MSG_Send(const char *cMessage);
 
 #endif

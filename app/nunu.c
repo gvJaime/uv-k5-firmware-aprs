@@ -1,4 +1,3 @@
-
 #include "nunu.h"
 
 void NUNU_prepare_message(DataPacket *dataPacket, uint8_t * message) {
@@ -20,4 +19,8 @@ void NUNU_clear(DataPacket *dataPacket) {
 
 uint8_t NUNU_is_valid(DataPacket *dataPacket) {
     return dataPacket->data.header >= INVALID_PACKET;
+}
+
+uint8_t NUNU_parse(DataPacket *dataPacket, uint8_t * origin) {
+    memcpy(dataPacket->serializedArray, origin, sizeof(dataPacket->serializedArray));
 }
