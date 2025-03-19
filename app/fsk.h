@@ -36,6 +36,7 @@ uint8_t * receive_buffer;
 void FSK_enable_rx(const bool enable);
 void FSK_send_data(char * data, uint16_t len);
 void FSK_configure(uint8_t rx, uint16_t size);
+void FSK_store_packet_interrupt(const uint16_t interrupt_bits);
 
 extern uint16_t gFSKWriteIndex;
 extern ModemStatus modem_status;

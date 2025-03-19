@@ -99,14 +99,6 @@ void MSG_SendPacket() {
 		if ( strlen((char *)dataPacket.data.payload) > 0) {
 	#endif
 
-		RADIO_PrepareTX();
-
-		if(RADIO_GetVfoState() != VFO_STATE_NORMAL){
-			gRequestDisplayScreen = DISPLAY_MAIN;
-			return;
-		}
-
-
 		// display sent message (before encryption)
 		#ifdef ENABLE_APRS
 		if(!APRS_is_ack(&ax25frame)) {

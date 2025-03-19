@@ -7,10 +7,11 @@
 #include "app.h"
 #include "functions.h"
 #include "app/fsk.h"
+#include "ui.h"
 
 uint16_t gFSKWriteIndex = 0;
 
-uint8_t receive_buffer[512];
+uint8_t transit_buffer[512];
 
 ModemStatus modem_status = READY;
 
@@ -20,7 +21,7 @@ void FSK_enable_rx(const bool enable) {
 		#ifdef ENABLE_APRS
 			FSK_configure(true, AX25_BITSTUFFED_MAX_SIZE);
 		#else
-			FSK_configure(true, sizeof(receive_buffer));
+			FSK_configure(true, sizeof(transit_buffer));
 		#endif
 
 		if(gEeprom.FSK_CONFIG.data.receive)
@@ -32,7 +33,7 @@ void FSK_enable_rx(const bool enable) {
 }
 
 
-void FSK_StorePacket(const uint16_t interrupt_bits) {
+void FSK_store_packet_interrupt(const uint16_t interrupt_bits) {
 
 	//const uint16_t rx_sync_flags   = BK4819_ReadRegister(BK4819_REG_0B);
 
@@ -59,10 +60,10 @@ void FSK_StorePacket(const uint16_t interrupt_bits) {
 		const uint16_t count = BK4819_ReadRegister(BK4819_REG_5E) & (7u << 0);  // almost full threshold
 		for (uint16_t i = 0; i < count; i++) {
 			const uint16_t word = BK4819_ReadRegister(BK4819_REG_5F);
-            if (gFSKWriteIndex < sizeof(receive_buffer))
-                receive_buffer[gFSKWriteIndex++] = (word >> 0) & 0xff;
-            if (gFSKWriteIndex < sizeof(receive_buffer))
-                receive_buffer[gFSKWriteIndex++] = (word >> 8) & 0xff;
+            if (gFSKWriteIndex < sizeof(transit_buffer))
+                transit_buffer[gFSKWriteIndex++] = (word >> 0) & 0xff;
+            if (gFSKWriteIndex < sizeof(transit_buffer))
+                transit_buffer[gFSKWriteIndex++] = (word >> 8) & 0xff;
 		}
 
 		SYSTEM_DelayMs(10);
@@ -328,7 +329,18 @@ void FSK_configure(uint8_t rx, uint16_t size) {
 
 void FSK_send_data(char * data, uint16_t len) {
 
+    if( modem_status != READY) return;
+
+    if(len == 0) return;
+
+    if(RADIO_GetVfoState() != VFO_STATE_NORMAL){
+        gRequestDisplayScreen = DISPLAY_MAIN;
+        return;
+    }
+
     modem_status = SENDING;
+
+    RADIO_PrepareTX();
 
     RADIO_SetVfoState(VFO_STATE_NORMAL);
     BK4819_ToggleGpioOut(BK4819_GPIO6_PIN2_GREEN, false);
@@ -458,8 +470,9 @@ void FSK_send_data(char * data, uint16_t len) {
     FSK_enable_rx(true);
 
     // clear packet buffer
-    MSG_ClearPacketBuffer();
+    memset(transit_buffer, 0, sizeof(transit_buffer));
 
     modem_status = READY;
 
 }
+
