@@ -162,6 +162,8 @@ OBJS += main.o
 ifeq ($(ENABLE_APRS),1)
 	OBJS += app/ax25.o
 	OBJS += app/aprs.o
+else
+	OBJS += app/nunu.o
 endif
 ifeq ($(ENABLE_MESSENGER),1)
 	OBJS += app/messenger.o

@@ -25,14 +25,6 @@
 #include <string.h>
 #include "driver/keyboard.h"
 
-enum {
-	NONCE_LENGTH = 13,
-  #ifdef ENABLE_APRS
-	  PAYLOAD_LENGTH = 256
-  #else
-    PAYLOAD_LENGTH = 30
-  #endif
-};
 
 typedef enum KeyboardType {
 	UPPERCASE,
@@ -41,33 +33,14 @@ typedef enum KeyboardType {
   	END_TYPE_KBRD
 } KeyboardType;
 
+#define MESSAGE_LENGTH 128
+
 extern KeyboardType keyboardType;
 extern uint16_t gErrorsDuringMSG;
-extern char cMessage[PAYLOAD_LENGTH];
-extern char rxMessage[4][PAYLOAD_LENGTH + 2];
+extern char cMessage[MESSAGE_LENGTH];
+extern char rxMessage[4][MESSAGE_LENGTH + 2];
 extern uint8_t hasNewMessage;
 extern uint8_t keyTickCounter;
-
-
-typedef enum PacketType {
-    MESSAGE_PACKET = 100u,
-    ENCRYPTED_MESSAGE_PACKET,
-    ACK_PACKET,
-    INVALID_PACKET
-} PacketType;
-
-// Data Packet definition                            // 2024 kamilsss655
-union DataPacket
-{
-  struct{
-    uint8_t header;
-    uint8_t payload[PAYLOAD_LENGTH];
-    unsigned char nonce[NONCE_LENGTH];
-    // uint8_t signature[SIGNATURE_LENGTH];
-  } data;
-  // header + payload + nonce = must be an even number
-  uint8_t serializedArray[1+PAYLOAD_LENGTH+NONCE_LENGTH];
-};
 
 // MessengerConfig                            // 2024 kamilsss655
 typedef union {

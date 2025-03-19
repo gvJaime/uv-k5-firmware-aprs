@@ -42,6 +42,8 @@
 #ifdef ENABLE_APRS
 	#include "app/aprs.h"
 	#include "app/ax25.h"
+#else
+	#include "app/nunu.h"
 #endif
 #include "app/fsk.h"
 
@@ -50,7 +52,7 @@ const uint8_t MSG_BUTTON_STATE_HELD = 1 << 1;
 const uint8_t MSG_BUTTON_EVENT_SHORT =  0;
 const uint8_t MSG_BUTTON_EVENT_LONG =  MSG_BUTTON_STATE_HELD;
 
-const uint8_t MAX_MSG_LENGTH = PAYLOAD_LENGTH - 1;
+const uint8_t MAX_MSG_LENGTH = MESSAGE_LENGTH - 1;
 
 #define NEXT_CHAR_DELAY 100 // 10ms tick
 
@@ -61,15 +63,17 @@ unsigned char numberOfLettersAssignedToKey[9] = { 4, 3, 3, 3, 3, 3, 4, 3, 4 };
 char T9TableNum[9][4] = { {'1', '\0', '\0', '\0'}, {'2', '\0', '\0', '\0'}, {'3', '\0', '\0', '\0'}, {'4', '\0', '\0', '\0'}, {'5', '\0', '\0', '\0'}, {'6', '\0', '\0', '\0'}, {'7', '\0', '\0', '\0'}, {'8', '\0', '\0', '\0'}, {'9', '\0', '\0', '\0'} };
 unsigned char numberOfNumsAssignedToKey[9] = { 1, 1, 1, 1, 1, 1, 1, 1, 1 };
 
-char cMessage[PAYLOAD_LENGTH];
-char lastcMessage[PAYLOAD_LENGTH];
-char rxMessage[4][PAYLOAD_LENGTH + 2];
+char cMessage[MESSAGE_LENGTH];
+char lastcMessage[MESSAGE_LENGTH];
+char rxMessage[4][MESSAGE_LENGTH + 2];
 unsigned char cIndex = 0;
 unsigned char prevKey = 0, prevLetter = 0;
 KeyboardType keyboardType = UPPERCASE;
 
-#ifndef ENABLE_APRS
-	union DataPacket dataPacket;
+#ifdef ENABLE_APRS
+	AX25UIFrame ax25frame;
+#else
+	DataPacket dataPacket;
 #endif
 
 uint16_t gErrorsDuringMSG;
@@ -79,7 +83,7 @@ uint8_t hasNewMessage = 0;
 uint8_t keyTickCounter = 0;
 
 
-void moveUP(char (*rxMessages)[PAYLOAD_LENGTH + 2]) {
+void moveUP(char (*rxMessages)[MESSAGE_LENGTH + 2]) {
     // Shift existing lines up
     strcpy(rxMessages[0], rxMessages[1]);
 	strcpy(rxMessages[1], rxMessages[2]);
@@ -90,8 +94,6 @@ void moveUP(char (*rxMessages)[PAYLOAD_LENGTH + 2]) {
 }
 
 void MSG_SendPacket() {
-
-	if ( modem_status != READY ) return;
 
 	#ifdef ENABLE_APRS
 		if ( ax25frame.len > 0) { // in the aprs implementation this function is expected to be called after checks
@@ -186,11 +188,7 @@ void MSG_SendAck() {
 		APRS_prepare_ack(&ax25frame, ack_id, origin_callsign);
 	#else
 		MSG_ClearPacketBuffer();
-		// in the future we might reply with received payload and then the sending radio
-		// could compare it and determine if the messegage was read correctly (kamilsss655)
-		dataPacket.data.header = ACK_PACKET;
-		// sending only empty header seems to not work, so set few bytes of payload to increase reliability (kamilsss655)
-		memset(dataPacket.data.payload, 255, 5);
+		NUNU_prepare_ack(&dataPacket);
 	#endif
 	MSG_SendPacket();
 }
@@ -225,7 +223,7 @@ void MSG_HandleReceive() {
 		uint8_t send_ack = 0;
 		if(valid && APRS_destined_to_user(&ax25frame)) {
 	#else
-		if (dataPacket.data.header >= INVALID_PACKET) {
+		if (NUNU_is_valid(&dataPacket)) {
 	#endif
 		snprintf(rxMessage[3], PAYLOAD_LENGTH + 2, "ERROR: INVALID PACKET.");
 	} else {
@@ -449,7 +447,7 @@ void MSG_ClearPacketBuffer()
 	#ifdef ENABLE_APRS
 		AX25_clear_old(&ax25frame);
 	#else
-		memset(dataPacket.serializedArray, 0, sizeof(dataPacket.serializedArray));
+		NUNU_clear(&dataPacket);
 	#endif
 }
 
@@ -468,8 +466,7 @@ void MSG_Send(const char *cMessage){
 	#ifdef ENABLE_APRS
 		APRS_prepare_message(&ax25frame, cMessage, false);
 	#else
-		dataPacket.data.header=MESSAGE_PACKET;
-		memcpy(dataPacket.data.payload, cMessage, sizeof(dataPacket.data.payload));
+		NUNU_prepare_message(&dataPacket, cMessage);
 	#endif
 	MSG_SendPacket();
 }
