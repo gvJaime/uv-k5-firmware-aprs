@@ -541,7 +541,7 @@ void MENU_AcceptSetting(void)
 
 		#ifdef ENABLE_MESSENGER
 			case MENU_MSG_RX:
-				gEeprom.MESSENGER_CONFIG.data.receive = gSubMenuSelection;
+				gEeprom.FSK_CONFIG.data.receive = gSubMenuSelection;
 				break;
 
 			case MENU_MSG_ACK:
@@ -549,7 +549,7 @@ void MENU_AcceptSetting(void)
 				break;
 
 			case MENU_MSG_MODULATION:
-				gEeprom.MESSENGER_CONFIG.data.modulation = gSubMenuSelection;
+				gEeprom.FSK_CONFIG.data.modulation = gSubMenuSelection;
 				break;
 		#endif
 
@@ -988,7 +988,7 @@ void MENU_ShowCurrentSetting(void)
 
 		#ifdef ENABLE_MESSENGER
 			case MENU_MSG_RX:
-				gSubMenuSelection = gEeprom.MESSENGER_CONFIG.data.receive;
+				gSubMenuSelection = gEeprom.FSK_CONFIG.data.receive;
 				break;
 
 			case MENU_MSG_ACK:
@@ -996,7 +996,7 @@ void MENU_ShowCurrentSetting(void)
 				break;
 
 			case MENU_MSG_MODULATION:
-				gSubMenuSelection = gEeprom.MESSENGER_CONFIG.data.modulation;
+				gSubMenuSelection = gEeprom.FSK_CONFIG.data.modulation;
 				break;
 		#endif
 

@@ -46,12 +46,9 @@ extern uint8_t keyTickCounter;
 typedef union {
   struct {
     uint8_t
-      receive    :1, // determines whether fsk modem will listen for new messages
       ack        :1, // determines whether the radio will automatically respond to messages with ACK
       encrypt    :1, // determines whether outgoing messages will be encrypted
-      unused     :1,
-      modulation :2, // determines FSK modulation type
-      unused2    :2;
+      unused     :6;
   } data;
   uint8_t __val;
 } MessengerConfig;

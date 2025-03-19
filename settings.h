@@ -27,6 +27,7 @@
 #include <helper/battery.h>
 #include "radio.h"
 #include <driver/backlight.h>
+#include "app/fsk.h"
 #ifdef ENABLE_MESSENGER
 	#include "app/messenger.h"
 #endif

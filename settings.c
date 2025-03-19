@@ -119,6 +119,7 @@ void SETTINGS_SaveSettings(void)
 	#endif
 	#ifdef ENABLE_MESSENGER
 		State[3] = gEeprom.MESSENGER_CONFIG.__val;
+		State[4] = gEeprom.FSK_CONFIG.__val;
 	#endif
 	EEPROM_WriteBuffer(0x0EA0, State, true);
 
