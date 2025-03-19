@@ -598,6 +598,7 @@ void BOARD_EEPROM_Init(void)
 	#endif
 	#ifdef ENABLE_MESSENGER
 		gEeprom.MESSENGER_CONFIG.__val = Data[3];
+		gEeprom.FSK_CONFIG.__val = Data[4];
 	#endif
 
 	// 0EA8..0EAF
