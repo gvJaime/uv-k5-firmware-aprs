@@ -7,11 +7,14 @@
 #include "app.h"
 #include "functions.h"
 #include "app/fsk.h"
-#include "ui.h"
+#include "ui/ui.h"
+#include "audio.h"
+#include "misc.h"
 
-uint16_t gFSKWriteIndex = 0;
 
 uint8_t transit_buffer[512];
+
+uint16_t gFSKWriteIndex = 0;
 
 void (*FSK_receive_callback)(uint8_t*);
 
@@ -333,7 +336,7 @@ void FSK_configure(uint8_t rx, uint16_t size) {
     BK4819_WriteRegister(BK4819_REG_02, 0);
 }
 
-void FSK_send_data(char * data, uint16_t len) {
+void FSK_send_data(uint8_t * data, uint16_t len) {
 
     if( modem_status != READY) return;
 

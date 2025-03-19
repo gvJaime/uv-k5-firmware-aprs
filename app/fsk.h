@@ -3,7 +3,6 @@
 
 #include <stdint.h>
 
-
 // MessengerConfig                            // 2024 kamilsss655
 typedef union {
   struct {
@@ -28,13 +27,12 @@ typedef enum ModemStatus {
   RECEIVING,
 } ModemStatus;
 
-extern uint16_t gFSKWriteIndex;
 extern ModemStatus modem_status;
 
 
 void FSK_init(void (*receive_callback)(uint8_t*));
 void FSK_enable_rx(const bool enable);
-void FSK_send_data(char * data, uint16_t len);
+void FSK_send_data(uint8_t * data, uint16_t len);
 void FSK_configure(uint8_t rx, uint16_t size);
 void FSK_store_packet_interrupt(const uint16_t interrupt_bits);
 

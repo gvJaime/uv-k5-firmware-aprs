@@ -228,7 +228,6 @@ void MSG_HandleReceive(uint8_t * receive_buffer) {
 		if(valid && APRS_destined_to_user(&ax25frame)) {
 	#else
 		valid = NUNU_parse(&dataPacket, receive_buffer);
-		valid = NUNU_is_valid(&dataPacket);
 	#endif
 
 	if(!valid) {

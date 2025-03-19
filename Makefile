@@ -49,8 +49,8 @@ ENABLE_MESSENGER_DELIVERY_NOTIFICATION  := 1
 ENABLE_MESSENGER_FSK_MUTE               := 1
 ENABLE_MESSENGER_NOTIFICATION           := 1
 ENABLE_MESSENGER_UART                   := 0
-ENABLE_ENCRYPTION                       := 0
-ENABLE_APRS                             := 1
+ENABLE_ENCRYPTION                       := 1
+ENABLE_APRS                             := 0
 
 #############################################################
 
@@ -166,9 +166,9 @@ else
 	OBJS += app/nunu.o
 endif
 ifeq ($(ENABLE_MESSENGER),1)
+	OBJS += app/fsk.o
 	OBJS += app/messenger.o
 	OBJS += ui/messenger.o
-	OBJS += app/fsk.o
 endif
 ifeq ($(ENABLE_ENCRYPTION),1)
 	OBJS += external/chacha/chacha.o

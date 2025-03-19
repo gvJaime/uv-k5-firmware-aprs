@@ -728,7 +728,7 @@ static void CheckRadioInterrupts(void)
 		#endif
 
 		#ifdef ENABLE_MESSENGER
-			MSG_StorePacket(interrupt_status_bits);
+			FSK_store_packet_interrupt(interrupt_status_bits);
 		#endif
 	}
 }

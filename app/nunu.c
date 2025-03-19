@@ -1,6 +1,8 @@
 #include "nunu.h"
 
-void NUNU_prepare_message(DataPacket *dataPacket, uint8_t * message) {
+#include <string.h>
+
+void NUNU_prepare_message(DataPacket *dataPacket, const char * message) {
     dataPacket->data.header=MESSAGE_PACKET;
     memcpy(dataPacket->data.payload, message, sizeof(dataPacket->data.payload));
 }
@@ -17,10 +19,7 @@ void NUNU_clear(DataPacket *dataPacket) {
     memset(dataPacket->serializedArray, 0, sizeof(dataPacket->serializedArray));
 }
 
-uint8_t NUNU_is_valid(DataPacket *dataPacket) {
-    return dataPacket->data.header >= INVALID_PACKET;
-}
-
 uint8_t NUNU_parse(DataPacket *dataPacket, uint8_t * origin) {
     memcpy(dataPacket->serializedArray, origin, sizeof(dataPacket->serializedArray));
+    return dataPacket->data.header >= INVALID_PACKET; 
 }
