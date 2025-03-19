@@ -20,8 +20,6 @@
 #ifndef APP_MSG_H
 #define APP_MSG_H
 
-#ifdef ENABLE_MESSENGER
-
 #include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
@@ -85,7 +83,6 @@ typedef union {
   uint8_t __val;
 } MessengerConfig;
 
-void MSG_EnableRX(const bool enable);
 void MSG_StorePacket(const uint16_t interrupt_bits);
 void MSG_Init();
 void MSG_ProcessKeys(KEY_Code_t Key, bool bKeyPressed, bool bKeyHeld);
@@ -100,7 +97,5 @@ void MSG_ClearPacketBuffer();
 #endif
 void MSG_HandleReceive();
 void MSG_Send(const char *cMessage);
-
-#endif
 
 #endif

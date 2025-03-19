@@ -8,13 +8,83 @@
 #include "functions.h"
 #include "app/fsk.h"
 
-#ifdef ENABLE_APRS
-#define APRS_PREAMBLE 33
-#endif
-
 uint16_t gFSKWriteIndex = 0;
 
+uint8_t receive_buffer[512];
+
 ModemStatus modem_status = READY;
+
+void FSK_enable_rx(const bool enable) {
+
+	if (enable) {
+		#ifdef ENABLE_APRS
+			FSK_configure(true, AX25_BITSTUFFED_MAX_SIZE);
+		#else
+			FSK_configure(true, sizeof(receive_buffer));
+		#endif
+
+		if(gEeprom.FSK_CONFIG.data.receive)
+			BK4819_FskEnableRx();
+	} else {
+		BK4819_WriteRegister(BK4819_REG_70, 0);
+		BK4819_WriteRegister(BK4819_REG_58, 0);
+	}
+}
+
+
+void FSK_StorePacket(const uint16_t interrupt_bits) {
+
+	//const uint16_t rx_sync_flags   = BK4819_ReadRegister(BK4819_REG_0B);
+
+	const bool rx_sync             = (interrupt_bits & BK4819_REG_02_FSK_RX_SYNC) ? true : false;
+	const bool rx_fifo_almost_full = (interrupt_bits & BK4819_REG_02_FSK_FIFO_ALMOST_FULL) ? true : false;
+	const bool rx_finished         = (interrupt_bits & BK4819_REG_02_FSK_RX_FINISHED) ? true : false;
+
+	//UART_printf("\nMSG : S%i, F%i, E%i | %i", rx_sync, rx_fifo_almost_full, rx_finished, interrupt_bits);
+
+	if (rx_sync) {
+		#ifdef ENABLE_MESSENGER_FSK_MUTE
+			// prevent listening to fsk data and squelch (kamilsss655)
+			// CTCSS codes seem to false trigger the rx_sync
+			if(gCurrentCodeType == CODE_TYPE_OFF)
+				AUDIO_AudioPathOff();
+		#endif
+		gFSKWriteIndex = 0;
+		MSG_ClearPacketBuffer();
+		modem_status = RECEIVING;
+	}
+
+	if (rx_fifo_almost_full && modem_status == RECEIVING) {
+
+		const uint16_t count = BK4819_ReadRegister(BK4819_REG_5E) & (7u << 0);  // almost full threshold
+		for (uint16_t i = 0; i < count; i++) {
+			const uint16_t word = BK4819_ReadRegister(BK4819_REG_5F);
+            if (gFSKWriteIndex < sizeof(receive_buffer))
+                receive_buffer[gFSKWriteIndex++] = (word >> 0) & 0xff;
+            if (gFSKWriteIndex < sizeof(receive_buffer))
+                receive_buffer[gFSKWriteIndex++] = (word >> 8) & 0xff;
+		}
+
+		SYSTEM_DelayMs(10);
+
+	}
+
+	if (rx_finished) {
+		// turn off green LED
+		BK4819_ToggleGpioOut(BK4819_GPIO6_PIN2_GREEN, 0);
+		BK4819_FskClearFifo();
+		BK4819_FskEnableRx();
+		modem_status = READY;
+
+        if(receive_callback)
+            receive_callback();
+
+		if (gFSKWriteIndex > 2) {
+			MSG_HandleReceive();
+		}
+		gFSKWriteIndex = 0;
+	}
+}
 
 void FSK_disable_tx() {
 	const uint16_t fsk_reg59 = BK4819_ReadRegister(BK4819_REG_59);
@@ -40,7 +110,7 @@ void FSK_configure(uint8_t rx, uint16_t size) {
     // <6:0>  0 TONE2/FSK tuning gain
     //        0 ~ 127
     //
-    switch(gEeprom.MESSENGER_CONFIG.data.modulation)
+    switch(gEeprom.FSK_CONFIG.data.modulation)
     {
         case MOD_AFSK_1200:
             TONE1_FREQ = 22714u;
@@ -54,7 +124,7 @@ void FSK_configure(uint8_t rx, uint16_t size) {
             break;
     }
 
-    switch(gEeprom.MESSENGER_CONFIG.data.modulation)
+    switch(gEeprom.FSK_CONFIG.data.modulation)
     {
         case MOD_AFSK_1200:
             BK4819_WriteRegister(BK4819_REG_70,
@@ -81,7 +151,7 @@ void FSK_configure(uint8_t rx, uint16_t size) {
     }
 
     
-    switch(gEeprom.MESSENGER_CONFIG.data.modulation)
+    switch(gEeprom.FSK_CONFIG.data.modulation)
     {
         case MOD_FSK_700:
         case MOD_FSK_450:
@@ -216,7 +286,7 @@ void FSK_configure(uint8_t rx, uint16_t size) {
 
     // configure main FSK params
 
-    switch(gEeprom.MESSENGER_CONFIG.data.modulation)
+    switch(gEeprom.FSK_CONFIG.data.modulation)
     {
         case MOD_AFSK_1200:
             BK4819_WriteRegister(BK4819_REG_59,
@@ -385,7 +455,7 @@ void FSK_send_data(char * data, uint16_t len) {
 
     BK4819_ToggleGpioOut(BK4819_GPIO5_PIN1_RED, false);
 
-    MSG_EnableRX(true);
+    FSK_enable_rx(true);
 
     // clear packet buffer
     MSG_ClearPacketBuffer();

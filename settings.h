@@ -254,6 +254,7 @@ typedef struct {
 #ifdef ENABLE_ENCRYPTION
 	char                  ENC_KEY[16];
 #endif
+	FSKConfig             FSK_CONFIG;
 #ifdef ENABLE_MESSENGER
 	MessengerConfig       MESSENGER_CONFIG;
 #endif

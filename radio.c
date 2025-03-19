@@ -751,7 +751,7 @@ void RADIO_SetupRegisters(bool switchToForeground)
 	#ifdef ENABLE_MESSENGER
 		if(gEeprom.MESSENGER_CONFIG.data.receive)
 		{
-			MSG_EnableRX(true);
+			FSK_enable_rx(true);
 			InterruptMask |= BK4819_REG_3F_FSK_RX_SYNC | BK4819_REG_3F_FSK_RX_FINISHED | BK4819_REG_3F_FSK_FIFO_ALMOST_FULL | BK4819_REG_3F_FSK_TX_FINISHED;
 		}
 	#endif	
