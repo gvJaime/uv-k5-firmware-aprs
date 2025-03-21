@@ -1,12 +1,21 @@
 #include "nunu.h"
 
 #include <string.h>
+#include "settings.h"
+#include "external/printf/printf.h"
+
+#ifdef ENABLE_ENCRYPTION
+    #include "helper/crypto.h"
+#endif
 
 void NUNU_prepare_message(DataPacket *dataPacket, const char * message) {
     dataPacket->data.header=MESSAGE_PACKET;
     memcpy(dataPacket->data.payload, message, sizeof(dataPacket->data.payload));
+
 	#ifdef ENABLE_ENCRYPTION
-        if(dataPacket->data.header == ENCRYPTED_MESSAGE_PACKET){
+        if(gEeprom.MESSENGER_CONFIG.data.encrypt)
+        {
+            dataPacket->data.header=ENCRYPTED_MESSAGE_PACKET;
 
             CRYPTO_Random(dataPacket->data.nonce, NONCE_LENGTH);
 
@@ -18,6 +27,10 @@ void NUNU_prepare_message(DataPacket *dataPacket, const char * message) {
                 gEncryptionKey,
                 256
             );
+        }
+        else
+        {
+            dataPacket->data.header=MESSAGE_PACKET;
         }
     #endif
 }
@@ -36,6 +49,17 @@ void NUNU_clear(DataPacket *dataPacket) {
 
 uint8_t NUNU_parse(DataPacket *dataPacket, uint8_t * origin) {
     memcpy(dataPacket->serializedArray, origin, sizeof(dataPacket->serializedArray));
+
+    if(dataPacket->data.header == ENCRYPTED_MESSAGE_PACKET)
+    {
+        CRYPTO_Crypt(dataPacket->data.payload,
+            PAYLOAD_LENGTH,
+            dataPacket->data.payload,
+            &dataPacket->data.nonce,
+            gEncryptionKey,
+            256);
+    }
+
     return dataPacket->data.header >= INVALID_PACKET; 
 }
 

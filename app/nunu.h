@@ -20,12 +20,12 @@ typedef union
 {
   struct{
     uint8_t header;
-    uint8_t payload[PAYLOAD_LENGTH];
+    char payload[PAYLOAD_LENGTH];
     unsigned char nonce[NONCE_LENGTH];
     // uint8_t signature[SIGNATURE_LENGTH];
   } data;
   // header + payload + nonce = must be an even number
-  uint8_t serializedArray[1+PAYLOAD_LENGTH+NONCE_LENGTH];
+  char serializedArray[1+PAYLOAD_LENGTH+NONCE_LENGTH];
 } DataPacket;
 
 void NUNU_prepare_message(DataPacket *dataPacket, const char * message);

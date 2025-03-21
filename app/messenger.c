@@ -181,23 +181,10 @@ void MSG_HandleReceive(uint8_t * receive_buffer) {
 		}
 		else
 		{
-			#ifdef ENABLE_ENCRYPTION // won't compile with APRS
-				if(dataPacket.data.header == ENCRYPTED_MESSAGE_PACKET)
-				{
-					CRYPTO_Crypt(dataPacket.data.payload,
-						PAYLOAD_LENGTH,
-						dataPacket.data.payload,
-						&dataPacket.data.nonce,
-						gEncryptionKey,
-						256);
-				}
-				NUNU_display_received(&dataPacket, rxMessage[3]);
+			#ifdef ENABLE_APRS
+				APRS_display_received(&ax25frame, rxMessage[3]);
 			#else
-				#ifdef ENABLE_APRS
-					APRS_display_received(&ax25frame, rxMessage[3]);
-				#else
-					NUNU_display_received(&dataPacket, rxMessage[3]);
-				#endif
+				NUNU_display_received(&dataPacket, rxMessage[3]);
 			#endif
 			#ifdef ENABLE_MESSENGER_UART
 				#ifdef ENABLE_APRS
@@ -393,16 +380,6 @@ void MSG_Send(char *cMessage){
 	}
 
 	MSG_ClearPacketBuffer();
-	#ifdef ENABLE_ENCRYPTION
-		if(gEeprom.MESSENGER_CONFIG.data.encrypt)
-		{
-			dataPacket.data.header=ENCRYPTED_MESSAGE_PACKET;
-		}
-		else
-		{
-			dataPacket.data.header=MESSAGE_PACKET;
-		}
-	#endif
 
 	#ifdef ENABLE_APRS
 		APRS_prepare_message(&ax25frame, cMessage, false);
