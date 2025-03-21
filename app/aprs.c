@@ -71,10 +71,10 @@ void APRS_prepare_message(AX25UIFrame* frame, const char * message, uint8_t is_a
     // source, destination and digis
     AX25_insert_destination(frame, aprs_destination, 0);
     AX25_insert_source(frame, gEeprom.APRS_CONFIG.callsign, gEeprom.APRS_CONFIG.ssid);
-    uint8_t * paths[2];
+    const char * paths[2];
     paths[0] = gEeprom.APRS_CONFIG.path1;
-    if(gEeprom.APRS_CONFIG.path2) {
-        paths[1] = gEeprom.APRS_CONFIG.path2
+    if(*gEeprom.APRS_CONFIG.path2) {
+        paths[1] = gEeprom.APRS_CONFIG.path2;
     }
     AX25_insert_paths(frame, paths, 2);
 
@@ -84,4 +84,23 @@ void APRS_prepare_message(AX25UIFrame* frame, const char * message, uint8_t is_a
     // increase message count
     if(!is_ack)
         msg_id++;
+}
+
+void APRS_display_received(AX25UIFrame* frame, char * field) {
+    if(!frame->readable) {
+        return;
+    }
+    // dump the message onto the display
+        AX25_get_source(frame, field);
+		sprintf(
+			field + strlen(field), // copy exactly after the destination
+			"> %s",
+			frame->info + 1 // skip the ":"
+		);
+}
+
+uint8_t APRS_parse(AX25UIFrame* frame, uint8_t * origin) {
+    // TODO:
+    frame->readable = *origin;
+    return false;
 }

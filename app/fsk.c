@@ -336,7 +336,7 @@ void FSK_configure(uint8_t rx, uint16_t size) {
     BK4819_WriteRegister(BK4819_REG_02, 0);
 }
 
-void FSK_send_data(uint8_t * data, uint16_t len) {
+void FSK_send_data(char * data, uint16_t len) {
 
     if( modem_status != READY) return;
 
@@ -405,17 +405,7 @@ void FSK_send_data(uint8_t * data, uint16_t len) {
 
 	SYSTEM_DelayMs(100);
 
-    #ifdef ENABLE_APRS
-	    FSK_configure(false, len + APRS_PREAMBLE);
-        SYSTEM_DelayMs(100);
-        {	// load a bunch of 0x7E into the buffer
-            for (uint16_t i = 0; i < APRS_PREAMBLE / 2; i++) {
-                BK4819_WriteRegister(BK4819_REG_5F, 0x7E7E);
-            }
-        }
-    #else
-        FSK_configure(false, len);
-    #endif
+    FSK_configure(false, len);
 
 
 	{	// load the entire packet data into the TX FIFO buffer

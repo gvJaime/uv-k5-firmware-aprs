@@ -17,7 +17,6 @@
  *     limitations under the License.
  */
 
-
 #include <string.h>
 #include "driver/keyboard.h"
 #include "driver/st7565.h"
@@ -93,59 +92,10 @@ void moveUP(char (*rxMessages)[MESSAGE_LENGTH + 2]) {
 	memset(rxMessages[3], 0, sizeof(rxMessages[3]));
 }
 
-void MSG_SendPacket() {
+void MSG_SendPacket(char * packet, uint16_t len) {
 
-	#ifdef ENABLE_APRS
-		if ( ax25frame.len > 0) { // in the aprs implementation this function is expected to be called after checks
-	#else
-		if ( strlen((char *)dataPacket.data.payload) > 0) {
-	#endif
-
-		// display sent message (before encryption)
-		#ifdef ENABLE_APRS
-		if(!APRS_is_ack(&ax25frame)) {
-		#else
-		if (dataPacket.data.header != ACK_PACKET) {
-		#endif
-			moveUP(rxMessage);
-			#ifdef ENABLE_APRS
-				MSG_DisplaySent(rxMessage[3]);
-			#else
-				sprintf(rxMessage[3], "> %s", dataPacket.data.payload);
-			#endif
-			memset(lastcMessage, 0, sizeof(lastcMessage));
-			#ifdef ENABLE_APRS
-				MSG_DisplaySent(lastcMessage);
-			#else
-				memcpy(lastcMessage, dataPacket.data.payload, PAYLOAD_LENGTH);
-			#endif
-			cIndex = 0;
-			prevKey = 0;
-			prevLetter = 0;
-			memset(cMessage, 0, sizeof(cMessage));
-		}
-
-		#ifdef ENABLE_ENCRYPTION
-			if(dataPacket.data.header == ENCRYPTED_MESSAGE_PACKET){
-
-				CRYPTO_Random(dataPacket.data.nonce, NONCE_LENGTH);
-
-				CRYPTO_Crypt(
-					dataPacket.data.payload,
-					PAYLOAD_LENGTH,
-					dataPacket.data.payload,
-					&dataPacket.data.nonce,
-					gEncryptionKey,
-					256
-				);
-			}
-		#endif
-
-		#ifdef ENABLE_APRS
-			FSK_send_data(ax25frame.stuff_buffer, ax25frame.len);
-		#else
-			FSK_send_data(dataPacket.serializedArray, sizeof(dataPacket.serializedArray));
-		#endif
+	if(len > 0) {
+		FSK_send_data(packet, len);
 
 	} else {
 		AUDIO_PlayBeep(BEEP_500HZ_60MS_DOUBLE_BEEP_OPTIONAL);
@@ -185,53 +135,33 @@ void MSG_SendAck() {
 	#ifdef ENABLE_APRS
 		char origin_callsign[CALLSIGN_SIZE + 1];
 		origin_callsign[CALLSIGN_SIZE] = 0;
-		strncpy(origin_callsign, ax25frame.buffer + 1 + CALLSIGN_SIZE, CALLSIGN_SIZE);
+		strncpy(origin_callsign, ax25frame.raw_buffer + 1, CALLSIGN_SIZE);
+
 		MSG_ClearPacketBuffer();
 		APRS_prepare_ack(&ax25frame, ack_id, origin_callsign);
+		MSG_SendPacket(ax25frame.raw_buffer, ax25frame.len);
 	#else
 		MSG_ClearPacketBuffer();
 		NUNU_prepare_ack(&dataPacket);
+		MSG_SendPacket(
+			dataPacket.serializedArray,
+			strlen((char *)dataPacket.data.payload)
+		);
 	#endif
-	MSG_SendPacket();
 }
 
-#ifdef ENABLE_APRS
-	void MSG_DisplayReceived(char * field) {
-		// dump the message onto the display
-		snprintf(field, CALLSIGN_SIZE, "%s", ax25frame.buffer + 1 + CALLSIGN_SIZE);
-		snprintf(
-			field + strlen(field), // copy exactly after the source
-			4, // enough to fit a 0 to 15 number and a hyphen, plus one for the 0 termination
-			"-%d",
-			ax25frame.buffer[1 + CALLSIGN_SIZE + CALLSIGN_SIZE - 1] && 0xFF // get the last byte of the src
-		);
-		snprintf(
-			field + strlen(field), // copy exactly after the destination
-			ax25frame.fcs_offset - ax25frame.control_offset - 2, // the length is the number of bytes between the control flag and the fcs minus one.
-			"> %s", // but that minus one is not stated, because we need that "one" for the starting colons.
-			ax25frame.buffer + ax25frame.control_offset + 2 // control field, plus pid, plus starting colon.
-		);
-	}
-
-	void MSG_DisplaySent(char * field) {
-		// dump the message onto the display
-		snprintf(field, ax25frame.fcs_offset - ax25frame.control_offset - 2, "%s", ax25frame.buffer + ax25frame.control_offset + 3);
-	}
-#endif
-
 void MSG_HandleReceive(uint8_t * receive_buffer) {
-	uint8_t valid;
+	
 
 	#ifdef ENABLE_APRS
-		valid = AX25_validate(&ax25frame);
 		uint8_t send_ack = 0;
-		if(valid && APRS_destined_to_user(&ax25frame)) {
+		uint8_t valid = APRS_parse(&ax25frame, receive_buffer);
 	#else
-		valid = NUNU_parse(&dataPacket, receive_buffer);
+		uint8_t valid = NUNU_parse(&dataPacket, receive_buffer);
 	#endif
 
 	if(!valid) {
-		snprintf(rxMessage[3], PAYLOAD_LENGTH + 2, "ERROR: INVALID PACKET.");
+		snprintf(rxMessage[3], MESSAGE_LENGTH + 2, "ERROR: INVALID PACKET.");
 	} else {
 		moveUP(rxMessage);
 		#ifdef ENABLE_APRS
@@ -261,12 +191,12 @@ void MSG_HandleReceive(uint8_t * receive_buffer) {
 						gEncryptionKey,
 						256);
 				}
-				snprintf(rxMessage[3], PAYLOAD_LENGTH + 2, "< %s", dataPacket.data.payload);
+				NUNU_display_received(&dataPacket, rxMessage[3]);
 			#else
 				#ifdef ENABLE_APRS
-					MSG_DisplayReceived(rxMessage[3]);
+					APRS_display_received(&ax25frame, rxMessage[3]);
 				#else
-					snprintf(rxMessage[3], PAYLOAD_LENGTH + 2, "< %s", dataPacket.data.payload);
+					NUNU_display_received(&dataPacket, rxMessage[3]);
 				#endif
 			#endif
 			#ifdef ENABLE_MESSENGER_UART
@@ -413,14 +343,14 @@ void  MSG_ProcessKeys(KEY_Code_t Key, bool bKeyPressed, bool bKeyHeld) {
 				break;
 			case KEY_UP:
 				memset(cMessage, 0, sizeof(cMessage));
-				memcpy(cMessage, lastcMessage, PAYLOAD_LENGTH);
+				memcpy(cMessage, lastcMessage, MESSAGE_LENGTH);
 				cIndex = strlen(cMessage);
 				break;
 			/*case KEY_DOWN:
 				break;*/
 			case KEY_MENU:
 				// Send message
-				if(sizeof(cMessage)){
+				if(strlen(cMessage)){
 					MSG_Send(cMessage);
 				}
 				break;
@@ -451,13 +381,17 @@ void  MSG_ProcessKeys(KEY_Code_t Key, bool bKeyPressed, bool bKeyHeld) {
 void MSG_ClearPacketBuffer()
 {
 	#ifdef ENABLE_APRS
-		AX25_clear_old(&ax25frame);
+		AX25_clear(&ax25frame);
 	#else
 		NUNU_clear(&dataPacket);
 	#endif
 }
 
-void MSG_Send(const char *cMessage){
+void MSG_Send(char *cMessage){
+	if(strlen(cMessage) < 1) {
+		return;
+	}
+
 	MSG_ClearPacketBuffer();
 	#ifdef ENABLE_ENCRYPTION
 		if(gEeprom.MESSENGER_CONFIG.data.encrypt)
@@ -469,10 +403,28 @@ void MSG_Send(const char *cMessage){
 			dataPacket.data.header=MESSAGE_PACKET;
 		}
 	#endif
+
 	#ifdef ENABLE_APRS
 		APRS_prepare_message(&ax25frame, cMessage, false);
+		MSG_SendPacket(ax25frame.raw_buffer, ax25frame.len);
 	#else
 		NUNU_prepare_message(&dataPacket, cMessage);
+		MSG_SendPacket(
+			dataPacket.serializedArray,
+			strlen((char *)dataPacket.data.payload)
+		);
 	#endif
-	MSG_SendPacket();
+
+	moveUP(rxMessage);
+
+	sprintf(rxMessage[3], "> %s", cMessage);
+
+	memset(lastcMessage, 0, sizeof(lastcMessage));
+
+	sprintf(lastcMessage, "> %s", cMessage);
+
+	cIndex = 0;
+	prevKey = 0;
+	prevLetter = 0;
+	memset(cMessage, 0, strlen(cMessage));
 }

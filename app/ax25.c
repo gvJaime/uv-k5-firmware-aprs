@@ -5,7 +5,16 @@
 #include "app/ax25.h"
 #include "external/printf/printf.h"
 
-uint8_t AX25_insert_destination(AX25UIFrame * self, uint8_t * callsign, uint8_t ssid) {
+int16_t AX25_find_offset(const char *arr, uint16_t arr_length, uint8_t target, uint16_t start_offset) {
+    for (uint16_t i = start_offset; i < arr_length; ++i) {
+        if (arr[i] == target) {
+            return i; // Return the index (offset) where the byte is found
+        }
+    }
+    return -1; // Return -1 if the target byte isn't found
+}
+
+uint8_t AX25_insert_destination(AX25UIFrame * self, const char * callsign, uint8_t ssid) {
     if (self == NULL || callsign == NULL) {
         return 0; // Error - invalid parameters
     }
@@ -30,7 +39,53 @@ uint8_t AX25_insert_destination(AX25UIFrame * self, uint8_t * callsign, uint8_t 
     return 1; // Success
 }
 
-uint8_t AX25_insert_source(AX25UIFrame * self, uint8_t * callsign, uint8_t ssid) {
+uint8_t AX25_get_source(AX25UIFrame * self, char * dst) {
+    if (self == NULL || dst == NULL || self->len < 14) {
+        return 0; // Error - invalid parameters or frame too short
+    }
+    
+    // Source address starts at position 7 (after destination address)
+    char *src_addr = &self->raw_buffer[7];
+    uint8_t i;
+    uint8_t ssid;
+    
+    // Extract callsign (right-shift by 1 bit)
+    for (i = 0; i < 6; i++) {
+        dst[i] = (src_addr[i] >> 1) & 0x7F;
+    }
+    
+    // Remove trailing spaces
+    while (i > 0 && dst[i-1] == ' ') {
+        i--;
+    }
+    
+    // Extract SSID from the 7th byte: 111SSID1 format
+    ssid = (src_addr[6] >> 1) & 0x0F;
+    
+    // Add SSID to string if it's non-zero
+    if (ssid > 0) {
+        dst[i] = '-';
+        
+        // Convert SSID to string
+        if (ssid < 10) {
+            // Single digit SSID
+            dst[i+1] = '0' + ssid;
+            dst[i+2] = '\0';
+        } else {
+            // Double digit SSID
+            dst[i+1] = '0' + (ssid / 10);
+            dst[i+2] = '0' + (ssid % 10);
+            dst[i+3] = '\0';
+        }
+    } else {
+        // No SSID, just terminate the string
+        dst[i] = '\0';
+    }
+    
+    return 1; // Success
+}
+
+uint8_t AX25_insert_source(AX25UIFrame * self, const char * callsign, uint8_t ssid) {
     if (self == NULL || callsign == NULL || self->len < 7) {
         return 0; // Error - invalid parameters or destination not set
     }
@@ -60,7 +115,7 @@ uint8_t AX25_insert_source(AX25UIFrame * self, uint8_t * callsign, uint8_t ssid)
     return 1; // Success
 }
 
-uint8_t AX25_insert_paths(AX25UIFrame * self, uint8_t ** path_strings, uint8_t paths) {
+uint8_t AX25_insert_paths(AX25UIFrame * self, const char ** path_strings, uint8_t paths) {
     if (self == NULL || path_strings == NULL || self->len < 14) {
         return 0; // Error - invalid parameters or source/dest not set
     }
@@ -73,7 +128,7 @@ uint8_t AX25_insert_paths(AX25UIFrame * self, uint8_t ** path_strings, uint8_t p
     
     // Add each path
     for (uint8_t path_idx = 0; path_idx < paths; path_idx++) {
-        uint8_t *path_string = path_strings[path_idx];
+        const char *path_string = path_strings[path_idx];
         if (path_string == NULL) continue;
         
         uint8_t callsign[7] = {0}; // Store the callsign part
@@ -138,7 +193,7 @@ uint8_t AX25_insert_info(AX25UIFrame * self, const char* format, ...) {
     va_start(args, format);
     
     // Calculate available space in the raw_buffer
-    size_t available_space = AX25_IFRAME_MAX_SIZE - (self->info - self->raw_buffer);
+    uint16_t available_space = AX25_IFRAME_MAX_SIZE - (self->info - self->raw_buffer);
     
     // Use vsnprintf to format the string with variable arguments
     int written = vsnprintf(self->info, available_space, format, args);
@@ -156,4 +211,13 @@ uint8_t AX25_insert_info(AX25UIFrame * self, const char* format, ...) {
     self->readable = 1; // Frame is now complete and readable
     
     return 1; // Success
+}
+
+void AX25_clear(AX25UIFrame* frame) {
+    frame->readable = 0;
+    frame->len = 0;
+    frame->control = NULL;
+    frame->pid = NULL;
+    frame->info = NULL;
+    memset(frame->raw_buffer, 0, AX25_IFRAME_MAX_SIZE);
 }

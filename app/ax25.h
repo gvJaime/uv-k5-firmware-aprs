@@ -15,20 +15,27 @@
 #define AX25_BITSTUFFED_MAX_SIZE ((AX25_IFRAME_MAX_SIZE * 13) / 10)
 
 typedef struct {
-    uint8_t * control;
-    uint8_t * pid;
-    uint8_t * info;
-    uint8_t raw_buffer[AX25_IFRAME_MAX_SIZE];
+    char * control;
+    char * pid;
+    char * info;
+    char raw_buffer[AX25_IFRAME_MAX_SIZE];
     uint16_t len;
     uint8_t readable;
 } AX25UIFrame;
 
-uint8_t AX25_insert_destination(AX25UIFrame * self, uint8_t * callsign, uint8_t ssid);
+int16_t AX25_find_offset(const char *arr, uint16_t arr_length, uint8_t target, uint16_t start_offset);
 
-uint8_t AX25_insert_source(AX25UIFrame * self, uint8_t * callsign, uint8_t ssid);
+uint8_t AX25_insert_destination(AX25UIFrame * self, const char * callsign, uint8_t ssid);
 
-uint8_t AX25_insert_paths(AX25UIFrame * self, uint8_t ** path_strings, uint8_t paths);
+uint8_t AX25_insert_source(AX25UIFrame * self, const char * callsign, uint8_t ssid);
+
+uint8_t AX25_get_source(AX25UIFrame * self, char * dst);
+
+uint8_t AX25_insert_paths(AX25UIFrame * self, const char ** path_strings, uint8_t paths);
 
 uint8_t AX25_insert_info(AX25UIFrame * self, const char* format, ...);
+
+
+void AX25_clear(AX25UIFrame* frame);
 
 #endif
