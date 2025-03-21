@@ -398,7 +398,7 @@ void MSG_Send(char *cMessage){
 
 	memset(lastcMessage, 0, sizeof(lastcMessage));
 
-	sprintf(lastcMessage, "> %s", cMessage);
+	sprintf(lastcMessage, "%s", cMessage);
 
 	cIndex = 0;
 	prevKey = 0;
