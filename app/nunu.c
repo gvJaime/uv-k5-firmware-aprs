@@ -10,7 +10,7 @@
 
 void NUNU_prepare_message(DataPacket *dataPacket, const char * message) {
     dataPacket->data.header=MESSAGE_PACKET;
-    memcpy(dataPacket->data.payload, message, sizeof(dataPacket->data.payload));
+    memcpy(dataPacket->data.payload, message, strlen(message));
 
 	#ifdef ENABLE_ENCRYPTION
         if(gEeprom.MESSENGER_CONFIG.data.encrypt)
@@ -48,17 +48,19 @@ void NUNU_clear(DataPacket *dataPacket) {
 }
 
 uint8_t NUNU_parse(DataPacket *dataPacket, uint8_t * origin) {
-    memcpy(dataPacket->serializedArray, origin, sizeof(dataPacket->serializedArray));
+    #ifdef ENABLE_ENCRYPTION
+        if(dataPacket->data.header == ENCRYPTED_MESSAGE_PACKET)
+        {
+            CRYPTO_Crypt(dataPacket->data.payload,
+                PAYLOAD_LENGTH,
+                dataPacket->data.payload,
+                &dataPacket->data.nonce,
+                gEncryptionKey,
+                256);
+        }
+    #endif
 
-    if(dataPacket->data.header == ENCRYPTED_MESSAGE_PACKET)
-    {
-        CRYPTO_Crypt(dataPacket->data.payload,
-            PAYLOAD_LENGTH,
-            dataPacket->data.payload,
-            &dataPacket->data.nonce,
-            gEncryptionKey,
-            256);
-    }
+    memcpy(dataPacket->serializedArray, origin, sizeof(dataPacket->serializedArray));
 
     return dataPacket->data.header >= INVALID_PACKET; 
 }
