@@ -12,7 +12,7 @@
 #include "misc.h"
 
 
-uint8_t transit_buffer[512];
+uint8_t transit_buffer[TRANSIT_BUFFER_SIZE];
 
 uint16_t gFSKWriteIndex = 0;
 
@@ -391,6 +391,9 @@ void FSK_send_data(char * data, uint16_t len) {
 
     if(len == 0) return;
 
+    // TODO: NRZI and or any other weirdness.
+    memcpy(transit_buffer, data, len);
+
     if(RADIO_GetVfoState() != VFO_STATE_NORMAL){
         gRequestDisplayScreen = DISPLAY_MAIN;
         return;
@@ -460,7 +463,7 @@ void FSK_send_data(char * data, uint16_t len) {
 	{	// load the entire packet data into the TX FIFO buffer
 
 		for (uint16_t i = 0, j = 0; i < len; i += 2, j++) {
-        	BK4819_WriteRegister(BK4819_REG_5F, (data[i + 1] << 8) | data[i]);
+        	BK4819_WriteRegister(BK4819_REG_5F, (transit_buffer[i + 1] << 8) | transit_buffer[i]);
     	}
 	}
 

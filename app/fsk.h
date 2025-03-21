@@ -3,6 +3,8 @@
 
 #include <stdint.h>
 
+#define TRANSIT_BUFFER_SIZE 512
+
 // MessengerConfig                            // 2024 kamilsss655
 typedef union {
   struct {
