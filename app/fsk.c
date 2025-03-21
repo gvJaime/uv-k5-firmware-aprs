@@ -102,7 +102,9 @@ void FSK_disable_tx() {
 }
 
 void FSK_configure(uint8_t rx, uint16_t size) {
-    uint16_t TONE1_FREQ;
+    #ifdef ENABLE_APRS
+        uint16_t TONE1_FREQ;
+    #endif
     uint16_t TONE2_FREQ;
     // REG_70
     //
@@ -123,7 +125,9 @@ void FSK_configure(uint8_t rx, uint16_t size) {
     switch(gEeprom.FSK_CONFIG.data.modulation)
     {
         case MOD_AFSK_1200:
-            TONE1_FREQ = 22714u;
+            #ifdef ENABLE_APRS
+                TONE1_FREQ = 22714u;
+            #endif
             TONE2_FREQ = 12389u;
             break;
         case MOD_FSK_700:
@@ -137,16 +141,27 @@ void FSK_configure(uint8_t rx, uint16_t size) {
     switch(gEeprom.FSK_CONFIG.data.modulation)
     {
         case MOD_AFSK_1200:
-            BK4819_WriteRegister(BK4819_REG_70,
-                ( 1u << 15) |    // 1 // APRS uses both tones
-                ( 0u <<  8) |    // 0
-                ( 1u <<  7) |    // 1
-                (96u <<  0));    // 96
+            #ifdef ENABLE_APRS
+                BK4819_WriteRegister(BK4819_REG_70,
+                    ( 1u << 15) |    // 1 // APRS uses both tones
+                    ( 0u <<  8) |    // 0
+                    ( 1u <<  7) |    // 1
+                    (96u <<  0));    // 96
 
-            // TONE 1
-            BK4819_WriteRegister(BK4819_REG_71, TONE1_FREQ);
-            // TONE 2
-            BK4819_WriteRegister(BK4819_REG_72, TONE2_FREQ);
+                // TONE 1
+                BK4819_WriteRegister(BK4819_REG_71, TONE1_FREQ);
+                // TONE 2
+                BK4819_WriteRegister(BK4819_REG_72, TONE2_FREQ);
+            #else
+                BK4819_WriteRegister(BK4819_REG_70,
+                    ( 0u << 15) |    // 0
+                    ( 0u <<  8) |    // 0
+                    ( 1u <<  7) |    // 1
+                    (96u <<  0));    // 96
+
+                // TONE 2
+                BK4819_WriteRegister(BK4819_REG_72, TONE2_FREQ);
+            #endif
             break;
         default:
             BK4819_WriteRegister(BK4819_REG_70,
@@ -262,20 +277,38 @@ void FSK_configure(uint8_t rx, uint16_t size) {
         break;
     }
 
-    // REG_5A .. bytes 0 & 1 sync pattern
-    //
-    // <15:8> sync byte 0
-    // < 7:0> sync byte 1
-    BK4819_WriteRegister(BK4819_REG_5A, 0x7e7e);
+    #ifdef ENABLE_APRS
+        // REG_5A .. bytes 0 & 1 sync pattern
+        //
+        // <15:8> sync byte 0
+        // < 7:0> sync byte 1
+        BK4819_WriteRegister(BK4819_REG_5A, 0x7e7e);
 
-    // REG_5B .. bytes 2 & 3 sync pattern
-    //
-    // <15:8> sync byte 2
-    // < 7:0> sync byte 3
-    BK4819_WriteRegister(BK4819_REG_5B, 0x7e7e);
+        // REG_5B .. bytes 2 & 3 sync pattern
+        //
+        // <15:8> sync byte 2
+        // < 7:0> sync byte 3
+        BK4819_WriteRegister(BK4819_REG_5B, 0x7e7e);
 
-    // disable CRC
-    BK4819_WriteRegister(BK4819_REG_5C, 0x5625);
+        // disable CRC
+        BK4819_WriteRegister(BK4819_REG_5C, 0x5625);
+    #else
+
+        // REG_5A .. bytes 0 & 1 sync pattern
+        //
+        // <15:8> sync byte 0
+        // < 7:0> sync byte 1
+        BK4819_WriteRegister(BK4819_REG_5A, 0x3072);
+
+        // REG_5B .. bytes 2 & 3 sync pattern
+        //
+        // <15:8> sync byte 2
+        // < 7:0> sync byte 3
+        BK4819_WriteRegister(BK4819_REG_5B, 0x576C);
+
+        // disable CRC
+        BK4819_WriteRegister(BK4819_REG_5C, 0x5625);
+    #endif
 
     // set the almost full threshold
     if(rx)
@@ -299,6 +332,7 @@ void FSK_configure(uint8_t rx, uint16_t size) {
     switch(gEeprom.FSK_CONFIG.data.modulation)
     {
         case MOD_AFSK_1200:
+        #ifdef ENABLE_APRS
             BK4819_WriteRegister(BK4819_REG_59,
                 (0u        <<       15) |   // 0/1     1 = clear TX FIFO
                 (0u        <<       14) |   // 0/1     1 = clear RX FIFO
@@ -312,6 +346,21 @@ void FSK_configure(uint8_t rx, uint16_t size) {
                 (0u        <<        3) |   // 0/1     sync length
                 (0u        <<        0)     // 0 ~ 7   ???
             );
+        #else
+            BK4819_WriteRegister(BK4819_REG_59,
+                (0u        <<       15) |   // 0/1     1 = clear TX FIFO
+                (0u        <<       14) |   // 0/1     1 = clear RX FIFO
+                (0u        <<       13) |   // 0/1     1 = scramble
+                (0u        <<       12) |   // 0/1     1 = enable RX
+                (0u        <<       11) |   // 0/1     1 = enable TX
+                (0u        <<       10) |   // 0/1     1 = invert data when RX
+                (0u        <<        9) |   // 0/1     1 = invert data when TX
+                (0u        <<        8) |   // 0/1     ???
+                ((rx ? 0u : 15u) <<  4) |   // 0 ~ 15  preamble length .. bit toggling
+                (0u        <<        3) |   // 0/1     sync length
+                (0u        <<        0)     // 0 ~ 7   ???
+            );
+        #endif
             break;
         case MOD_FSK_700:
         case MOD_FSK_450:
