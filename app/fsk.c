@@ -523,7 +523,12 @@ void FSK_send_data(char * data, uint16_t len) {
 
     // use full FIFO on first pass
     for (uint16_t j = 0; tx_index < len && j < TX_FIFO_SEGMENT + TX_FIFO_THRESHOLD; tx_index += 2, j++) {
-        BK4819_WriteRegister(BK4819_REG_5F, (data[tx_index + 1] << 8) | data[tx_index]);
+        if (tx_index + 1 < len) {
+            BK4819_WriteRegister(BK4819_REG_5F, (transit_buffer[tx_index + 1] << 8) | transit_buffer[tx_index]);
+        } else {
+            // Handle odd length by padding with zero
+            BK4819_WriteRegister(BK4819_REG_5F, 0x00 | transit_buffer[tx_index]);
+        }
     }
     
     // Enable FSK TX
@@ -564,7 +569,12 @@ void FSK_send_data(char * data, uint16_t len) {
 
         // if tx is not finished, load segment.
         for (uint16_t j = 0; tx_index < len && j < TX_FIFO_SEGMENT; tx_index += 2, j++) {
-            BK4819_WriteRegister(BK4819_REG_5F, (data[tx_index + 1] << 8) | data[tx_index]);
+            if (tx_index + 1 < len) {
+                BK4819_WriteRegister(BK4819_REG_5F, (transit_buffer[tx_index + 1] << 8) | transit_buffer[tx_index]);
+            } else {
+                // Handle odd length by padding with zero
+                BK4819_WriteRegister(BK4819_REG_5F, 0x00 | transit_buffer[tx_index]);
+            }
         }
     }
 
