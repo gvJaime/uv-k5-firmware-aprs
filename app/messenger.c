@@ -337,7 +337,7 @@ void  MSG_ProcessKeys(KEY_Code_t Key, bool bKeyPressed, bool bKeyHeld) {
 				break;*/
 			case KEY_MENU:
 				// Send message
-				if(strlen(cMessage)){
+				if(strlen(cMessage) && gEeprom.FSK_CONFIG.data.modulation){
 					MSG_Send(cMessage);
 				}
 				break;
