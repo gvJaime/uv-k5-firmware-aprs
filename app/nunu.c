@@ -62,7 +62,7 @@ uint8_t NUNU_parse(DataPacket *dataPacket, uint8_t * origin) {
 
     memcpy(dataPacket->serializedArray, origin, sizeof(dataPacket->serializedArray));
 
-    return dataPacket->data.header >= INVALID_PACKET; 
+    return dataPacket->data.header < INVALID_PACKET && dataPacket->data.header >= MESSAGE_PACKET;
 }
 
 void NUNU_display_received(DataPacket *dataPacket, char * field) {
