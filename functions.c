@@ -167,7 +167,7 @@ void FUNCTION_Select(FUNCTION_Type_t Function)
 
 		case FUNCTION_TRANSMIT:
 			#ifdef ENABLE_MESSENGER
-				FSK_enable_rx(false);	
+				FSK_disable_rx();	
 			#endif	
 
 			// if DTMF is enabled when TX'ing, it changes the TX audio filtering !! .. 1of11

@@ -11,6 +11,8 @@
 #include "audio.h"
 #include "misc.h"
 
+#define TX_FIFO_SEGMENT 64
+#define TX_FIFO_THRESHOLD 64u
 
 uint8_t transit_buffer[TRANSIT_BUFFER_SIZE];
 
@@ -20,28 +22,24 @@ void (*FSK_receive_callback)(uint8_t*);
 
 ModemStatus modem_status = READY;
 
+void FSK_disable_tx() {
+	const uint16_t fsk_reg59 = BK4819_ReadRegister(BK4819_REG_59);
+	BK4819_WriteRegister(BK4819_REG_59, fsk_reg59 & ~(1u << 11) );
+}
+
+void FSK_disable_rx() {
+	const uint16_t fsk_reg59 = BK4819_ReadRegister(BK4819_REG_59);
+	BK4819_WriteRegister(BK4819_REG_59, fsk_reg59 & ~(1u << 12) );
+}
+
 void FSK_init(void (*receive_callback)(uint8_t*) ) {
     modem_status = READY;
     FSK_receive_callback = receive_callback; 
+    FSK_configure();
+    FSK_disable_tx();
+    if(gEeprom.FSK_CONFIG.data.receive)
+        BK4819_FskEnableRx();
 }
-
-void FSK_enable_rx(const bool enable) {
-
-	if (enable) {
-		#ifdef ENABLE_APRS
-			FSK_configure(true, AX25_BITSTUFFED_MAX_SIZE);
-		#else
-			FSK_configure(true, sizeof(transit_buffer));
-		#endif
-
-		if(gEeprom.FSK_CONFIG.data.receive)
-			BK4819_FskEnableRx();
-	} else {
-		BK4819_WriteRegister(BK4819_REG_70, 0);
-		BK4819_WriteRegister(BK4819_REG_58, 0);
-	}
-}
-
 
 void FSK_store_packet_interrupt(const uint16_t interrupt_bits) {
 
@@ -96,12 +94,24 @@ void FSK_store_packet_interrupt(const uint16_t interrupt_bits) {
 	}
 }
 
-void FSK_disable_tx() {
-	const uint16_t fsk_reg59 = BK4819_ReadRegister(BK4819_REG_59);
-	BK4819_WriteRegister(BK4819_REG_59, ~(1u << 11) & fsk_reg59);
+uint16_t FSK_set_tx_length(uint16_t len) {
+    // Extract the low 8 bits (bits 0-7 of len)
+    uint8_t low_bits = len & 0xFF;
+    
+    // Extract the high 3 bits (bits 8-10 of len) and position them at bits 5-7
+    uint8_t high_bits = (len >> 8) & 0x07;
+    
+    // Combine them in register 5D format: low 8 bits in 15:8, high 3 bits in 7:5
+    uint16_t reg_value = (low_bits << 8) | (high_bits << 5);
+    
+    // Write to the register
+    BK4819_WriteRegister(BK4819_REG_5D, reg_value);
+    
+    return len;
 }
 
-void FSK_configure(uint8_t rx, uint16_t size) {
+
+void FSK_configure() {
     #ifdef ENABLE_APRS
         uint16_t TONE1_FREQ;
     #endif
@@ -359,17 +369,12 @@ void FSK_configure(uint8_t rx, uint16_t size) {
         BK4819_WriteRegister(BK4819_REG_5C, 0x5625);
     #endif
 
-    // set the almost full threshold
-    if(rx)
-        BK4819_WriteRegister(BK4819_REG_5E, (64u << 3) | (1u << 0));  // 0 ~ 127, 0 ~ 7
+    // set the almost empty tx and almost full rx threshold
+    BK4819_WriteRegister(BK4819_REG_5E, (TX_FIFO_THRESHOLD << 3) | (1u << 0));  // 0 ~ 127, 0 ~ 7
 
     // packet size .. sync + packet - size of a single packet
 
     // size -= (fsk_reg59 & (1u << 3)) ? 4 : 2;
-    if(rx)
-        size = (((size + 1) / 2) * 2) + 2;             // round up to even, else FSK RX doesn't work
-
-    BK4819_WriteRegister(BK4819_REG_5D, (size << 8));
     // BK4819_WriteRegister(BK4819_REG_5D, ((sizeof(dataPacket.serializedArray)) << 8));
 
     // clear FIFO's
@@ -405,7 +410,7 @@ void FSK_configure(uint8_t rx, uint16_t size) {
                 (0u        <<       10) |   // 0/1     1 = invert data when RX
                 (0u        <<        9) |   // 0/1     1 = invert data when TX
                 (0u        <<        8) |   // 0/1     ???
-                ((rx ? 0u : 15u) <<  4) |   // 0 ~ 15  preamble length .. bit toggling
+                (15u       <<        4) |   // 0 ~ 15  preamble length .. bit toggling
                 (0u        <<        3) |   // 0/1     sync length
                 (0u        <<        0)     // 0 ~ 7   ???
             );
@@ -422,7 +427,7 @@ void FSK_configure(uint8_t rx, uint16_t size) {
                 (0u        <<       10) |   // 0/1     1 = invert data when RX
                 (0u        <<        9) |   // 0/1     1 = invert data when TX
                 (0u        <<        8) |   // 0/1     ???
-                ((rx ? 0u : 15u) <<  4) |   // 0 ~ 15  preamble length .. bit toggling
+                (15u       <<        4) |   // 0 ~ 15  preamble length .. bit toggling
                 (0u        <<        3) |   // 0/1     sync length
                 (0u        <<        0)     // 0 ~ 7   ???
             );
@@ -447,6 +452,8 @@ void FSK_send_data(char * data, uint16_t len) {
         gRequestDisplayScreen = DISPLAY_MAIN;
         return;
     }
+
+    FSK_disable_rx();
 
     modem_status = SENDING;
 
@@ -506,43 +513,69 @@ void FSK_send_data(char * data, uint16_t len) {
 
 	SYSTEM_DelayMs(100);
 
-    FSK_configure(false, len);
+    // FSK_configure(false, len);
+
+    FSK_set_tx_length(len);
+
+    // Load the entire packet data into the TX FIFO buffer
+
+    uint16_t tx_index = 0;
+
+    // use full FIFO on first pass
+    for (uint16_t j = 0; tx_index < len && j < TX_FIFO_SEGMENT + TX_FIFO_THRESHOLD; tx_index += 2, j++) {
+        BK4819_WriteRegister(BK4819_REG_5F, (data[tx_index + 1] << 8) | data[tx_index]);
+    }
+    
+    // Enable FSK TX
+    BK4819_FskEnableTx();
+    while(tx_index < len) {
+        // Allow up to 310ms for the TX to complete
+        uint16_t timeout = 1290;
+        uint8_t tx_finished = 0;
+
+        while (timeout-- > 0 && !tx_finished)
+        {
+            SYSTEM_DelayMs(5);
+            uint16_t reg_0c = BK4819_ReadRegister(BK4819_REG_0C);
+            
+            if (reg_0c & (1u << 0))
+            {   // We have interrupt flags
+                uint16_t reg_02 = BK4819_ReadRegister(BK4819_REG_02);
+                
+                if (reg_02 & BK4819_REG_02_FSK_TX_FINISHED)
+                {
+                    reg_02 &= ~BK4819_REG_02_FSK_TX_FINISHED;
+                    tx_finished = 1;
+                }
+                else if (reg_02 & (BK4819_REG_02_FSK_FIFO_ALMOST_EMPTY))
+                {
+                    reg_02 &= ~BK4819_REG_02_FSK_FIFO_ALMOST_EMPTY;
+                    // get out, and load more bytes
+                    break;
+                }
+                
+                // Clear only the flags we've handled
+                BK4819_WriteRegister(BK4819_REG_02, reg_02);
+            }
+        }
+
+        if(tx_finished || timeout == 0) // exit if any segment timed out
+            break;
+
+        // if tx is not finished, load segment.
+        for (uint16_t j = 0; tx_index < len && j < TX_FIFO_SEGMENT; tx_index += 2, j++) {
+            BK4819_WriteRegister(BK4819_REG_5F, (data[tx_index + 1] << 8) | data[tx_index]);
+        }
+    }
 
 
-	{	// load the entire packet data into the TX FIFO buffer
 
-		for (uint16_t i = 0, j = 0; i < len; i += 2, j++) {
-        	BK4819_WriteRegister(BK4819_REG_5F, (transit_buffer[i + 1] << 8) | transit_buffer[i]);
-    	}
-	}
-
-	// enable FSK TX
-	BK4819_FskEnableTx();
-
-	{
-		// allow up to 310ms for the TX to complete
-		// if it takes any longer then somethings gone wrong, we shut the TX down
-		uint16_t timeout = 1290;
-
-		while (timeout-- > 0)
-		{
-			SYSTEM_DelayMs(5);
-			if (BK4819_ReadRegister(BK4819_REG_0C) & (1u << 0))
-			{	// we have interrupt flags
-				BK4819_WriteRegister(BK4819_REG_02, 0);
-				if (BK4819_ReadRegister(BK4819_REG_02) & BK4819_REG_02_FSK_TX_FINISHED)
-					timeout = 0;       // TX is complete
-			}
-		}
-	}
-	//BK4819_WriteRegister(BK4819_REG_02, 0);
-
-	SYSTEM_DelayMs(100);
+    SYSTEM_DelayMs(100);
 
     FSK_disable_tx();
 
 	// disable TX
-	FSK_configure(true, len);
+	// FSK_configure(true, len);
 
 	// restore FM deviation level
 	BK4819_WriteRegister(BK4819_REG_40, dev_val);
@@ -567,7 +600,8 @@ void FSK_send_data(char * data, uint16_t len) {
 
     BK4819_ToggleGpioOut(BK4819_GPIO5_PIN1_RED, false);
 
-    FSK_enable_rx(true);
+    if(gEeprom.FSK_CONFIG.data.receive)
+        BK4819_FskEnableRx();
 
     // clear packet buffer
     memset(transit_buffer, 0, sizeof(transit_buffer));
