@@ -88,8 +88,10 @@ void FSK_store_packet_interrupt(const uint16_t interrupt_bits) {
 
 		if (gFSKWriteIndex > 2) {
             if(FSK_receive_callback)
+                // TODO: un NRZI maybe?
                 FSK_receive_callback(transit_buffer);
 		}
+        memset(transit_buffer, 0, TRANSIT_BUFFER_SIZE);
 		gFSKWriteIndex = 0;
 	}
 }
@@ -440,6 +442,7 @@ void FSK_configure() {
 }
 
 void FSK_send_data(char * data, uint16_t len) {
+    memset(transit_buffer, 0, TRANSIT_BUFFER_SIZE);
 
     if( modem_status != READY) return;
 
