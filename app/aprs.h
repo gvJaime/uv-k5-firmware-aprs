@@ -26,7 +26,14 @@ uint8_t APRS_is_ack(AX25UIFrame* frame);
 uint8_t APRS_destined_to_user(AX25UIFrame* frame);
 uint16_t APRS_get_msg_id(AX25UIFrame* frame);
 void APRS_prepare_ack(AX25UIFrame* frame, uint16_t for_message_id, char * for_callsign);
-void APRS_prepare_message(AX25UIFrame* frame, const char * message, uint8_t is_ack);
+
+/**
+ * Inserts the message into the provided AX.25 frame.
+ * 
+ * Please mind that the [readable] flag will become false, as the packet becomes unreadable
+ * due to bit stuffing.
+ */
+uint16_t APRS_prepare_message(AX25UIFrame* frame, const char * message, uint8_t is_ack);
 void APRS_display_received(AX25UIFrame* frame, char * field);
 uint8_t APRS_parse(AX25UIFrame* frame, char * origin);
 

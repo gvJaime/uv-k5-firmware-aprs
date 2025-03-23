@@ -65,7 +65,7 @@ void APRS_prepare_ack(AX25UIFrame* frame, uint16_t for_message_id, char * for_ca
 }
 
 // TODO: Bit stuffing per section 3.6 of AX25 spec if needed
-void APRS_prepare_message(AX25UIFrame* frame, const char * message, uint8_t is_ack) {
+uint16_t APRS_prepare_message(AX25UIFrame* frame, const char * message, uint8_t is_ack) {
     AX25_clear(frame);
 
     // source, destination and digis
@@ -84,6 +84,8 @@ void APRS_prepare_message(AX25UIFrame* frame, const char * message, uint8_t is_a
     // increase message count
     if(!is_ack)
         msg_id++;
+
+    return strlen(frame->raw_buffer);
 }
 
 void APRS_display_received(AX25UIFrame* frame, char * field) {

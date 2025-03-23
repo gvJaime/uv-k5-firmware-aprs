@@ -28,7 +28,14 @@ typedef union
   char serializedArray[1+PAYLOAD_LENGTH+NONCE_LENGTH];
 } DataPacket;
 
-void NUNU_prepare_message(DataPacket *dataPacket, const char * message);
+
+/**
+ * Prepares the messages into a datapacket, leaving it's buffer ready
+ * go be passed onto the modem.
+ * 
+ * @returns the length of the whole packet, in bytes
+ */
+uint16_t NUNU_prepare_message(DataPacket *dataPacket, const char * message);
 void NUNU_prepare_ack(DataPacket *dataPacket);
 void NUNU_clear(DataPacket *dataPacket);
 void NUNU_display_received(DataPacket *dataPacket, char * field);

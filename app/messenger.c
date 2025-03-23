@@ -369,13 +369,13 @@ void MSG_Send(char *cMessage){
 	}
 
 	#ifdef ENABLE_APRS
-		APRS_prepare_message(&ax25frame, cMessage, false);
-		MSG_SendPacket(ax25frame.raw_buffer, ax25frame.len);
+		uint16_t len = APRS_prepare_message(&ax25frame, cMessage, false);
+		MSG_SendPacket(ax25frame.raw_buffer, len);
 	#else
-		NUNU_prepare_message(&dataPacket, cMessage);
+		uint16_t len = NUNU_prepare_message(&dataPacket, cMessage);
 		MSG_SendPacket(
 			dataPacket.serializedArray,
-			strlen(dataPacket.serializedArray) + 1 // include terminating 0
+			len // include terminating 0
 		);
 	#endif
 
