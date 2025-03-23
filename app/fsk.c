@@ -1,4 +1,6 @@
 #include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
 
 #include "driver/st7565.h"
 #include "driver/bk4819.h"
@@ -22,6 +24,103 @@ uint16_t gFSKWriteIndex = 0;
 void (*FSK_receive_callback)(char*);
 
 ModemStatus modem_status = READY;
+
+/**
+ * Decodes an NRZI (Non-Return-to-Zero Inverted) encoded buffer back to its original form
+ * where '0' caused a state change and '1' maintained the state during encoding
+ * 
+ * This implementation processes the buffer in-place, one byte at a time
+ * 
+ * @param buffer The buffer to decode in-place
+ * @param length Length of the buffer in bytes
+ * @param initial_state The initial state of the NRZI encoding (typically 1)
+ * @return 0 on success, -1 on failure
+ */
+int8_t FSK_decode_nrzi(char *buffer, size_t length, uint8_t initial_state) {
+    if (!buffer || length == 0) {
+        return -1;
+    }
+
+    uint8_t prev_bit = initial_state;
+    
+    char encoded_byte;
+
+    // Process each byte in the buffer
+    for (size_t i = 0; i < length; i++) {
+        // Save the encoded byte value
+        encoded_byte = buffer[i];
+        // Clear the current byte for writing the decoded value
+        buffer[i] = 0;
+        
+        // Process each bit in the byte (MSB first)
+        for (int8_t bit_idx = 7; bit_idx >= 0; bit_idx--) {
+            // Extract the current bit from the encoded byte
+            uint8_t current_bit = (encoded_byte >> bit_idx) & 0x01;
+            
+            // If the state changed, it was a '0' bit, otherwise it was a '1' bit
+            uint8_t decoded_bit = (current_bit == prev_bit) ? 1 : 0;
+            
+            // Set the decoded bit in the output
+            if (decoded_bit) {
+                buffer[i] |= (1 << bit_idx);
+            }
+            
+            // Update the previous bit for the next iteration
+            prev_bit = current_bit;
+        }
+    }
+    
+    return 0;
+}
+
+/**
+ * Encodes a buffer of bytes into NRZI (Non-Return-to-Zero Inverted) format
+ * where '0' causes a state change and '1' maintains the current state
+ * 
+ * This implementation processes the buffer in-place, one byte at a time
+ * 
+ * @param buffer The buffer to encode in-place
+ * @param length Length of the buffer in bytes
+ * @return 0 on success, -1 on failure
+ */
+int8_t FSK_encode_nrzi(char *buffer, size_t length, uint8_t initial_nrzi_state) {
+    if (!buffer || length == 0) {
+        return -1;
+    }
+
+    // Initialize NRZI state (typically starts at 1)
+    uint8_t nrzi_state = initial_nrzi_state;
+
+    char original_byte;
+
+    // Process each byte in the buffer
+    for (size_t i = 0; i < length; i++) {
+        // Save the original byte value
+        original_byte = buffer[i];
+        // Clear the current byte for writing the encoded value
+        buffer[i] = 0;
+
+        // Process each bit in the byte (MSB first)
+        for (int8_t bit_idx = 7; bit_idx >= 0; bit_idx--) {
+            // Extract the current bit from the original byte
+            uint8_t bit = (original_byte >> bit_idx) & 0x01;
+
+            // In this NRZI variant, a '0' bit causes a state change
+            if (bit == 0) {
+                nrzi_state = !nrzi_state;
+            }
+            // '1' bit maintains the current state (no change needed)
+
+            // Set or clear the bit in the output at the same position
+            if (nrzi_state) {
+                buffer[i] |= (1 << bit_idx);
+            }
+            // If nrzi_state is 0, the bit remains 0 (already cleared)
+        }
+    }
+    return 0;
+}
+
 
 void FSK_disable_tx() {
 	const uint16_t fsk_reg59 = BK4819_ReadRegister(BK4819_REG_59);

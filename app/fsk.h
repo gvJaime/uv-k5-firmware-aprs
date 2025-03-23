@@ -11,6 +11,7 @@ typedef union {
     uint8_t
       receive    :1, // determines whether fsk modem will listen for new messages
       modulation :2, // determines FSK modulation type
+      nrzi       :1, // uses NRZI encoding for bits
       unused     :5;
   } data;
   uint8_t __val;

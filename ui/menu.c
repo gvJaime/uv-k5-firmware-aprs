@@ -125,6 +125,7 @@ const t_menu_item MenuList[] =
 	{"MsgRx",  VOICE_ID_INVALID,                       MENU_MSG_RX        }, // messenger rx
 	{"MsgAck", VOICE_ID_INVALID,                       MENU_MSG_ACK       }, // messenger respond ACK
 	{"MsgMod", VOICE_ID_INVALID,                       MENU_MSG_MODULATION}, // messenger modulation
+	{"NRZIsk", VOICE_ID_INVALID,                       MENU_MSG_NRZI      }, // non-return-zero encoding
 #ifdef ENABLE_APRS
 	{"CallSg", VOICE_ID_INVALID,                       MENU_APRS_CALLSIGN  }, // APRS callsign
 	{"SSID"  , VOICE_ID_INVALID,                       MENU_APRS_SSID      }, // APRS SSID
@@ -689,6 +690,7 @@ void UI_DisplayMenu(void)
 			#ifdef ENABLE_MESSENGER
 				case MENU_MSG_RX:
 				case MENU_MSG_ACK:
+				case MENU_MSG_NRZI:
 			#endif
 			case MENU_350TX:
 			case MENU_200TX:
