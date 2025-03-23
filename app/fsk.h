@@ -32,7 +32,7 @@ typedef enum ModemStatus {
 extern ModemStatus modem_status;
 
 
-void FSK_init(void (*receive_callback)(uint8_t*));
+void FSK_init(void (*receive_callback)(char*));
 void FSK_configure();
 void FSK_disable_rx();
 void FSK_send_data(char * data, uint16_t len);

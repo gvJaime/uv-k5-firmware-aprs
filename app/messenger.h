@@ -56,14 +56,13 @@ typedef union {
 void MSG_Init();
 void MSG_ProcessKeys(KEY_Code_t Key, bool bKeyPressed, bool bKeyHeld);
 void MSG_SendPacket(char * packet, uint16_t len);
-void MSG_ClearPacketBuffer();
 #ifdef ENABLE_APRS
   void MSG_SendAck(uint16_t ack_id);
   void MSG_DisplaySent(char * field);
 #else
   void MSG_SendAck();
 #endif
-void MSG_HandleReceive(uint8_t * receive_buffer);
+void MSG_HandleReceive(char * receive_buffer);
 void MSG_Send(char *cMessage);
 
 #endif

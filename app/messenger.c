@@ -137,20 +137,18 @@ void MSG_SendAck() {
 		origin_callsign[CALLSIGN_SIZE] = 0;
 		strncpy(origin_callsign, ax25frame.raw_buffer + 1, CALLSIGN_SIZE);
 
-		MSG_ClearPacketBuffer();
 		APRS_prepare_ack(&ax25frame, ack_id, origin_callsign);
 		MSG_SendPacket(ax25frame.raw_buffer, ax25frame.len);
 	#else
-		MSG_ClearPacketBuffer();
 		NUNU_prepare_ack(&dataPacket);
 		MSG_SendPacket(
 			dataPacket.serializedArray,
-			strlen((char *)dataPacket.data.payload)
+			strlen((char *)dataPacket.serializedArray)
 		);
 	#endif
 }
 
-void MSG_HandleReceive(uint8_t * receive_buffer) {
+void MSG_HandleReceive(char * receive_buffer) {
 	
 
 	#ifdef ENABLE_APRS
@@ -365,21 +363,10 @@ void  MSG_ProcessKeys(KEY_Code_t Key, bool bKeyPressed, bool bKeyHeld) {
 
 }
 
-void MSG_ClearPacketBuffer()
-{
-	#ifdef ENABLE_APRS
-		AX25_clear(&ax25frame);
-	#else
-		NUNU_clear(&dataPacket);
-	#endif
-}
-
 void MSG_Send(char *cMessage){
 	if(strlen(cMessage) < 1) {
 		return;
 	}
-
-	MSG_ClearPacketBuffer();
 
 	#ifdef ENABLE_APRS
 		APRS_prepare_message(&ax25frame, cMessage, false);
@@ -388,7 +375,7 @@ void MSG_Send(char *cMessage){
 		NUNU_prepare_message(&dataPacket, cMessage);
 		MSG_SendPacket(
 			dataPacket.serializedArray,
-			strlen((char *)dataPacket.data.payload)
+			strlen((char *)dataPacket.serializedArray)
 		);
 	#endif
 

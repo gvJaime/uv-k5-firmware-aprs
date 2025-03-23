@@ -9,6 +9,7 @@
 #endif
 
 void NUNU_prepare_message(DataPacket *dataPacket, const char * message) {
+    NUNU_clear(dataPacket);
     dataPacket->data.header=MESSAGE_PACKET;
     memcpy(dataPacket->data.payload, message, strlen(message));
 
@@ -28,14 +29,11 @@ void NUNU_prepare_message(DataPacket *dataPacket, const char * message) {
                 256
             );
         }
-        else
-        {
-            dataPacket->data.header=MESSAGE_PACKET;
-        }
     #endif
 }
 
 void NUNU_prepare_ack(DataPacket *dataPacket) {
+    NUNU_clear(dataPacket);
     // in the future we might reply with received payload and then the sending radio
     // could compare it and determine if the messegage was read correctly (kamilsss655)
     dataPacket->data.header = ACK_PACKET;
@@ -47,7 +45,8 @@ void NUNU_clear(DataPacket *dataPacket) {
     memset(dataPacket->serializedArray, 0, sizeof(dataPacket->serializedArray));
 }
 
-uint8_t NUNU_parse(DataPacket *dataPacket, uint8_t * origin) {
+uint8_t NUNU_parse(DataPacket *dataPacket, char * origin) {
+    NUNU_clear(dataPacket);
     #ifdef ENABLE_ENCRYPTION
         if(dataPacket->data.header == ENCRYPTED_MESSAGE_PACKET)
         {
@@ -60,7 +59,7 @@ uint8_t NUNU_parse(DataPacket *dataPacket, uint8_t * origin) {
         }
     #endif
 
-    memcpy(dataPacket->serializedArray, origin, sizeof(dataPacket->serializedArray));
+    memcpy(dataPacket->serializedArray, origin, strlen(origin));
 
     return dataPacket->data.header < INVALID_PACKET && dataPacket->data.header >= MESSAGE_PACKET;
 }
