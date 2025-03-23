@@ -541,16 +541,20 @@ void FSK_send_data(char * data, uint16_t len) {
 	BK4819_WriteRegister(BK4819_REG_2B, (1u << 2) | (1u << 0));
 	
 
-	SYSTEM_DelayMs(100);
 
     uint16_t old_length = FSK_get_data_length();
     FSK_set_data_length(len);
 
-    // Load the entire packet data into the TX FIFO buffer
+    // Enable FSK TX
+    BK4819_FskEnableTx();
 
-    uint16_t tx_index = 0;
+    // this delay REALLY has to be here. Potentially replaceable with an interrupt wait but I don't know.
+    // if you don't wait, bytes in the FIFO will just not be properly understood by the modem
+	SYSTEM_DelayMs(100);
+
 
     // use full FIFO on first pass
+    uint16_t tx_index = 0;
     for (uint16_t j = 0; tx_index < len && j < TX_FIFO_SEGMENT + TX_FIFO_THRESHOLD; tx_index += 2, j++) {
         if (tx_index + 1 < len) {
             BK4819_WriteRegister(BK4819_REG_5F, (transit_buffer[tx_index + 1] << 8) | transit_buffer[tx_index]);
@@ -559,9 +563,6 @@ void FSK_send_data(char * data, uint16_t len) {
             BK4819_WriteRegister(BK4819_REG_5F, 0x00 | transit_buffer[tx_index]);
         }
     }
-    
-    // Enable FSK TX
-    BK4819_FskEnableTx();
     while(tx_index < len) {
         // Allow up to 310ms for the TX to complete
         uint16_t timeout = 1290;
@@ -583,6 +584,7 @@ void FSK_send_data(char * data, uint16_t len) {
                 else if (reg_02 & (BK4819_REG_02_FSK_FIFO_ALMOST_EMPTY))
                 {
                     reg_02 &= ~BK4819_REG_02_FSK_FIFO_ALMOST_EMPTY;
+
                     // if tx is not finished, load segment.
                     for (uint16_t j = 0; tx_index < len && j < TX_FIFO_SEGMENT; tx_index += 2, j++) {
                         if (tx_index + 1 < len) {
