@@ -143,7 +143,7 @@ void MSG_SendAck() {
 		NUNU_prepare_ack(&dataPacket);
 		MSG_SendPacket(
 			dataPacket.serializedArray,
-			strlen((char *)dataPacket.serializedArray)
+			strlen(dataPacket.serializedArray)
 		);
 	#endif
 }
@@ -375,7 +375,7 @@ void MSG_Send(char *cMessage){
 		NUNU_prepare_message(&dataPacket, cMessage);
 		MSG_SendPacket(
 			dataPacket.serializedArray,
-			strlen((char *)dataPacket.serializedArray)
+			strlen(dataPacket.serializedArray)
 		);
 	#endif
 
