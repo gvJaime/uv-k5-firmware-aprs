@@ -565,9 +565,8 @@ void FSK_send_data(char * data, uint16_t len) {
     while(tx_index < len) {
         // Allow up to 310ms for the TX to complete
         uint16_t timeout = 1290;
-        uint8_t tx_finished = 0;
 
-        while (timeout-- > 0 && !tx_finished)
+        while (timeout-- > 0)
         {
             SYSTEM_DelayMs(5);
             uint16_t reg_0c = BK4819_ReadRegister(BK4819_REG_0C);
@@ -579,13 +578,20 @@ void FSK_send_data(char * data, uint16_t len) {
                 if (reg_02 & BK4819_REG_02_FSK_TX_FINISHED)
                 {
                     reg_02 &= ~BK4819_REG_02_FSK_TX_FINISHED;
-                    tx_finished = 1;
+                    break;
                 }
                 else if (reg_02 & (BK4819_REG_02_FSK_FIFO_ALMOST_EMPTY))
                 {
                     reg_02 &= ~BK4819_REG_02_FSK_FIFO_ALMOST_EMPTY;
-                    // get out, and load more bytes
-                    break;
+                    // if tx is not finished, load segment.
+                    for (uint16_t j = 0; tx_index < len && j < TX_FIFO_SEGMENT; tx_index += 2, j++) {
+                        if (tx_index + 1 < len) {
+                            BK4819_WriteRegister(BK4819_REG_5F, (transit_buffer[tx_index + 1] << 8) | transit_buffer[tx_index]);
+                        } else {
+                            // Handle odd length by padding with zero
+                            BK4819_WriteRegister(BK4819_REG_5F, 0x00 | transit_buffer[tx_index]);
+                        }
+                    }
                 }
                 
                 // Clear only the flags we've handled
@@ -593,18 +599,8 @@ void FSK_send_data(char * data, uint16_t len) {
             }
         }
 
-        if(tx_finished || tx_index >= len || timeout == 0) // also exit if any segment timed out
+        if(tx_index >= len || timeout == 0) // also exit if any segment timed out
             break;
-
-        // if tx is not finished, load segment.
-        for (uint16_t j = 0; tx_index < len && j < TX_FIFO_SEGMENT; tx_index += 2, j++) {
-            if (tx_index + 1 < len) {
-                BK4819_WriteRegister(BK4819_REG_5F, (transit_buffer[tx_index + 1] << 8) | transit_buffer[tx_index]);
-            } else {
-                // Handle odd length by padding with zero
-                BK4819_WriteRegister(BK4819_REG_5F, 0x00 | transit_buffer[tx_index]);
-            }
-        }
     }
 
 

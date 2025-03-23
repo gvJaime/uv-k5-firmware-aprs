@@ -58,7 +58,6 @@ void MSG_ProcessKeys(KEY_Code_t Key, bool bKeyPressed, bool bKeyHeld);
 void MSG_SendPacket(char * packet, uint16_t len);
 #ifdef ENABLE_APRS
   void MSG_SendAck(uint16_t ack_id);
-  void MSG_DisplaySent(char * field);
 #else
   void MSG_SendAck();
 #endif

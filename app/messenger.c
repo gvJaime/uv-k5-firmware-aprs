@@ -375,7 +375,7 @@ void MSG_Send(char *cMessage){
 		NUNU_prepare_message(&dataPacket, cMessage);
 		MSG_SendPacket(
 			dataPacket.serializedArray,
-			strlen(dataPacket.serializedArray)
+			strlen(dataPacket.serializedArray) + 1 // include terminating 0
 		);
 	#endif
 
