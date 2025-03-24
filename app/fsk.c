@@ -17,6 +17,8 @@
 #define TX_FIFO_THRESHOLD 64u
 #define RX_FIFO_THRESHOLD 1u
 
+#define NRZI_PREAMBLE 15u
+
 char transit_buffer[TRANSIT_BUFFER_SIZE];
 
 uint16_t gFSKWriteIndex = 0;
@@ -27,6 +29,10 @@ ModemStatus modem_status = READY;
 
 uint16_t _sync_01;
 uint16_t _sync_23;
+
+uint16_t processed_sync_01;
+uint16_t processed_sync_23;
+uint8_t nrzi_sync_state;
 
 /**
  * Decodes an NRZI (Non-Return-to-Zero Inverted) encoded buffer back to its original form
@@ -135,6 +141,28 @@ void FSK_disable_rx() {
 	BK4819_WriteRegister(BK4819_REG_59, fsk_reg59 & ~(1u << 12) );
 }
 
+char* FSK_find_end_of_sync_words(char* buffer, uint16_t buffer_length) {
+    char sync_pattern[4];
+    sync_pattern[0] = (char)(processed_sync_01 & 0xFF);
+    sync_pattern[1] = (char)((processed_sync_01 >> 8) & 0xFF);
+    sync_pattern[2] = (char)(processed_sync_23 & 0xFF);
+    sync_pattern[3] = (char)((processed_sync_23 >> 8) & 0xFF);
+
+    uint16_t i = 0;
+    while (i + 3 < buffer_length) {
+        if (buffer[i] != sync_pattern[0] ||
+            buffer[i+1] != sync_pattern[1] ||
+            buffer[i+2] != sync_pattern[2] ||
+            buffer[i+3] != sync_pattern[3]) {
+            return &buffer[i];
+        }
+        i += 4;
+    }
+
+    // If we've reached this point, the entire buffer is sync words
+    return NULL;
+}
+
 void FSK_init(
     uint16_t sync_01,
     uint16_t sync_23,
@@ -142,8 +170,8 @@ void FSK_init(
 ) {
     modem_status = READY;
     FSK_receive_callback = receive_callback;
-    _sync_23 = sync_01;
-    _sync_01 = sync_23;
+    _sync_23 = sync_23;
+    _sync_01 = sync_01;
     FSK_configure();
     FSK_disable_tx();
     if(gEeprom.FSK_CONFIG.data.receive)
@@ -195,9 +223,15 @@ void FSK_store_packet_interrupt(const uint16_t interrupt_bits) {
 		modem_status = READY;
 
 		if (gFSKWriteIndex > 2) {
-            if(FSK_receive_callback)
-                // TODO: un NRZI maybe?
+            if(FSK_receive_callback){
+                if(gEeprom.FSK_CONFIG.data.nrzi) {
+                    char * beginning = FSK_find_end_of_sync_words(transit_buffer, gFSKWriteIndex);
+                    uint16_t new_len = gFSKWriteIndex - (beginning - transit_buffer);
+                    FSK_decode_nrzi(beginning, new_len, nrzi_sync_state);
+                    FSK_receive_callback(beginning); // Potentially refiring an Ack.
+                }
                 FSK_receive_callback(transit_buffer); // Potentially refiring an Ack.
+            }
 		}
 		gFSKWriteIndex = 0;
         memset(transit_buffer, 0, TRANSIT_BUFFER_SIZE);
@@ -472,17 +506,42 @@ void FSK_configure() {
         break;
     }
 
+    if(gEeprom.FSK_CONFIG.data.nrzi) {
+        processed_sync_01 = _sync_01;
+        processed_sync_23 = _sync_23;
+        FSK_encode_nrzi((char*) &processed_sync_01, 2, 1);
+
+        // Calculate final state after first encoding
+        // Get the last byte of processed_sync_01 (assuming little-endian)
+        char last_byte = ((char*)&processed_sync_01)[1];
+        // The last bit processed is the LSB (bit 0)
+        nrzi_sync_state = (last_byte & 0x01) ? 1 : 0;
+
+        // Encode second sync word with the final state from first encoding
+        FSK_encode_nrzi((char*) &processed_sync_23, 2, nrzi_sync_state);
+
+
+        // Get the last byte of processed_sync_23 (assuming little-endian)
+        last_byte = ((char*)&processed_sync_23)[1];
+        // and store it so buffers can be adapted accordingly
+        nrzi_sync_state = (last_byte & 0x01) ? 1 : 0;
+
+    } else {
+        processed_sync_01 = _sync_01;
+        processed_sync_23 = _sync_23;
+    }
+
     // REG_5A .. bytes 0 & 1 sync pattern
     //
     // <15:8> sync byte 0
     // < 7:0> sync byte 1
-    BK4819_WriteRegister(BK4819_REG_5A, _sync_01);
+    BK4819_WriteRegister(BK4819_REG_5A, processed_sync_01);
 
     // REG_5B .. bytes 2 & 3 sync pattern
     //
     // <15:8> sync byte 2
     // < 7:0> sync byte 3
-    BK4819_WriteRegister(BK4819_REG_5B, _sync_23);
+    BK4819_WriteRegister(BK4819_REG_5B, processed_sync_23);
 
     // disable CRC
     BK4819_WriteRegister(BK4819_REG_5C, 0x5625);
@@ -500,57 +559,24 @@ void FSK_configure() {
 
 
     // configure main FSK params
-
-    switch(gEeprom.FSK_CONFIG.data.modulation)
-    {
-        case MOD_AFSK_1200:
-        #ifdef ENABLE_APRS
-            BK4819_WriteRegister(BK4819_REG_59,
-                (0u        <<       15) |   // 0/1     1 = clear TX FIFO
-                (0u        <<       14) |   // 0/1     1 = clear RX FIFO
-                (0u        <<       13) |   // 0/1     1 = scramble
-                (0u        <<       12) |   // 0/1     1 = enable RX
-                (0u        <<       11) |   // 0/1     1 = enable TX
-                (0u        <<       10) |   // 0/1     1 = invert data when RX
-                (0u        <<        9) |   // 0/1     1 = invert data when TX
-                (0u        <<        8) |   // 0/1     ???
-                (0u        <<        4) |   // 0 ~ 15  preamble length .. bit toggling
-                (0u        <<        3) |   // 0/1     sync length
-                (0u        <<        0)     // 0 ~ 7   ???
-            );
-        #else
-            BK4819_WriteRegister(BK4819_REG_59,
-                (0u        <<       15) |   // 0/1     1 = clear TX FIFO
-                (0u        <<       14) |   // 0/1     1 = clear RX FIFO
-                (0u        <<       13) |   // 0/1     1 = scramble
-                (0u        <<       12) |   // 0/1     1 = enable RX
-                (0u        <<       11) |   // 0/1     1 = enable TX
-                (0u        <<       10) |   // 0/1     1 = invert data when RX
-                (0u        <<        9) |   // 0/1     1 = invert data when TX
-                (0u        <<        8) |   // 0/1     ???
-                (15u       <<        4) |   // 0 ~ 15  preamble length .. bit toggling
-                (1u        <<        3) |   // 0/1     sync length
-                (0u        <<        0)     // 0 ~ 7   ???
-            );
-        #endif
-            break;
-        case MOD_FSK_700:
-        case MOD_FSK_450:
-            BK4819_WriteRegister(BK4819_REG_59,
-                (0u        <<       15) |   // 0/1     1 = clear TX FIFO
-                (0u        <<       14) |   // 0/1     1 = clear RX FIFO
-                (0u        <<       13) |   // 0/1     1 = scramble
-                (0u        <<       12) |   // 0/1     1 = enable RX
-                (0u        <<       11) |   // 0/1     1 = enable TX
-                (0u        <<       10) |   // 0/1     1 = invert data when RX
-                (0u        <<        9) |   // 0/1     1 = invert data when TX
-                (0u        <<        8) |   // 0/1     ???
-                (15u       <<        4) |   // 0 ~ 15  preamble length .. bit toggling
-                (1u        <<        3) |   // 0/1     sync length
-                (0u        <<        0)     // 0 ~ 7   ???
-            );
-            break;
+    uint8_t preamble = 15u;
+    if(gEeprom.FSK_CONFIG.data.nrzi) {
+        preamble = 0u; // don't use or expect any preamble for NRZI as none of the preambles are valid
     }
+
+    BK4819_WriteRegister(BK4819_REG_59,
+        (0u        <<       15) |   // 0/1     1 = clear TX FIFO
+        (0u        <<       14) |   // 0/1     1 = clear RX FIFO
+        (0u        <<       13) |   // 0/1     1 = scramble
+        (0u        <<       12) |   // 0/1     1 = enable RX
+        (0u        <<       11) |   // 0/1     1 = enable TX
+        (0u        <<       10) |   // 0/1     1 = invert data when RX
+        (0u        <<        9) |   // 0/1     1 = invert data when TX
+        (0u        <<        8) |   // 0/1     ???
+        (preamble  <<        4) |   // 0 ~ 15  preamble length .. bit toggling
+        (1u        <<        3) |   // 0/1     sync length
+        (0u        <<        0)     // 0 ~ 7   ???
+    );
 
 
     // clear interupts
@@ -564,8 +590,19 @@ void FSK_send_data(char * data, uint16_t len) {
 
     if(len == 0) return;
 
-    // TODO: NRZI and or any other weirdness.
-    memcpy(transit_buffer, data, len);
+    if(gEeprom.FSK_CONFIG.data.nrzi) {
+        memcpy(transit_buffer + 4 * NRZI_PREAMBLE, data, len);
+        // duplicate the sync bytes to increase chances of digital read lock
+        for(uint8_t i = 0; i < NRZI_PREAMBLE; i++) {
+            transit_buffer[i*4]     = (uint8_t)(_sync_01 & 0xFF);        // Low byte of first sync word
+            transit_buffer[i*4 + 1] = (uint8_t)((_sync_01 >> 8) & 0xFF); // High byte of first sync word
+            transit_buffer[i*4 + 2] = (uint8_t)(_sync_23 & 0xFF);        // Low byte of second sync word
+            transit_buffer[i*4 + 3] = (uint8_t)((_sync_23 >> 8) & 0xFF); // High byte of second sync word
+        }
+        FSK_encode_nrzi(transit_buffer, len, nrzi_sync_state);
+    } else {
+        memcpy(transit_buffer, data, len);
+    }
 
     if(RADIO_GetVfoState() != VFO_STATE_NORMAL){
         gRequestDisplayScreen = DISPLAY_MAIN;
