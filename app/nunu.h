@@ -3,6 +3,9 @@
 
 #include <stdint.h>
 
+#define NUNU_SYNC_WORD_01 0x3072
+#define NUNU_SYNC_WORD_23 0x576C
+
 enum {
 	NONCE_LENGTH = 13,
     PAYLOAD_LENGTH = 30

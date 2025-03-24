@@ -25,6 +25,9 @@ void (*FSK_receive_callback)(char*);
 
 ModemStatus modem_status = READY;
 
+uint16_t _sync_01;
+uint16_t _sync_23;
+
 /**
  * Decodes an NRZI (Non-Return-to-Zero Inverted) encoded buffer back to its original form
  * where '0' caused a state change and '1' maintained the state during encoding
@@ -132,9 +135,15 @@ void FSK_disable_rx() {
 	BK4819_WriteRegister(BK4819_REG_59, fsk_reg59 & ~(1u << 12) );
 }
 
-void FSK_init(void (*receive_callback)(char*) ) {
+void FSK_init(
+    uint16_t sync_01,
+    uint16_t sync_23,
+    void (*receive_callback)(char*)
+) {
     modem_status = READY;
-    FSK_receive_callback = receive_callback; 
+    FSK_receive_callback = receive_callback;
+    _sync_23 = sync_01;
+    _sync_01 = sync_23;
     FSK_configure();
     FSK_disable_tx();
     if(gEeprom.FSK_CONFIG.data.receive)
@@ -463,38 +472,20 @@ void FSK_configure() {
         break;
     }
 
-    #ifdef ENABLE_APRS
-        // REG_5A .. bytes 0 & 1 sync pattern
-        //
-        // <15:8> sync byte 0
-        // < 7:0> sync byte 1
-        BK4819_WriteRegister(BK4819_REG_5A, 0x7e7e);
+    // REG_5A .. bytes 0 & 1 sync pattern
+    //
+    // <15:8> sync byte 0
+    // < 7:0> sync byte 1
+    BK4819_WriteRegister(BK4819_REG_5A, _sync_01);
 
-        // REG_5B .. bytes 2 & 3 sync pattern
-        //
-        // <15:8> sync byte 2
-        // < 7:0> sync byte 3
-        BK4819_WriteRegister(BK4819_REG_5B, 0x7e7e);
+    // REG_5B .. bytes 2 & 3 sync pattern
+    //
+    // <15:8> sync byte 2
+    // < 7:0> sync byte 3
+    BK4819_WriteRegister(BK4819_REG_5B, _sync_23);
 
-        // disable CRC
-        BK4819_WriteRegister(BK4819_REG_5C, 0x5625);
-    #else
-
-        // REG_5A .. bytes 0 & 1 sync pattern
-        //
-        // <15:8> sync byte 0
-        // < 7:0> sync byte 1
-        BK4819_WriteRegister(BK4819_REG_5A, 0x3072);
-
-        // REG_5B .. bytes 2 & 3 sync pattern
-        //
-        // <15:8> sync byte 2
-        // < 7:0> sync byte 3
-        BK4819_WriteRegister(BK4819_REG_5B, 0x576C);
-
-        // disable CRC
-        BK4819_WriteRegister(BK4819_REG_5C, 0x5625);
-    #endif
+    // disable CRC
+    BK4819_WriteRegister(BK4819_REG_5C, 0x5625);
 
     // set the almost empty tx and almost full rx threshold
     BK4819_WriteRegister(BK4819_REG_5E, (TX_FIFO_THRESHOLD << 3) | (RX_FIFO_THRESHOLD << 0));  // 0 ~ 127, 0 ~ 7

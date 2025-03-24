@@ -118,7 +118,19 @@ void MSG_Init() {
     prevLetter = 0;
 	cIndex = 0;
 
-	FSK_init(&MSG_HandleReceive);
+	#ifdef ENABLE_APRS
+		FSK_init(
+			AX25_SYNC_WORD_01,
+			AX25_SYNC_WORD_23,
+			&MSG_HandleReceive
+		);
+	#else
+		FSK_init(
+			NUNU_SYNC_WORD_01,
+			NUNU_SYNC_WORD_23,
+			&MSG_HandleReceive
+		);
+	#endif
 
 	#ifdef ENABLE_ENCRYPTION
 		gRecalculateEncKey = true;
