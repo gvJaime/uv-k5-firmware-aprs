@@ -81,19 +81,18 @@ void FSK_store_packet_interrupt(const uint16_t interrupt_bits) {
 	if (rx_finished) {
 		// turn off green LED
 		BK4819_ToggleGpioOut(BK4819_GPIO6_PIN2_GREEN, 0);
-
-
-		if (gFSKWriteIndex > 2) {
-            if(FSK_receive_callback)
-                // TODO: un NRZI maybe?
-                FSK_receive_callback(transit_buffer);
-		}
-        memset(transit_buffer, 0, TRANSIT_BUFFER_SIZE);
 		BK4819_FskClearFifo();
         if(gEeprom.FSK_CONFIG.data.receive)
             BK4819_FskEnableRx();
 		modem_status = READY;
+
+		if (gFSKWriteIndex > 2) {
+            if(FSK_receive_callback)
+                // TODO: un NRZI maybe?
+                FSK_receive_callback(transit_buffer); // Potentially refiring an Ack.
+		}
 		gFSKWriteIndex = 0;
+        memset(transit_buffer, 0, TRANSIT_BUFFER_SIZE);
 	}
 }
 
