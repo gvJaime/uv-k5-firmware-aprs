@@ -32,6 +32,8 @@ uint16_t NUNU_prepare_message(DataPacket *dataPacket, const char * message) {
         } else {
             return strlen(dataPacket->serializedArray) + 1; // the ending 0 must be transmitted.
         }
+    #else
+        return strlen(dataPacket->serializedArray) + 1; // the ending 0 must be transmitted.
     #endif
 }
 
@@ -48,7 +50,7 @@ void NUNU_clear(DataPacket *dataPacket) {
     memset(dataPacket->serializedArray, 0, sizeof(dataPacket->serializedArray));
 }
 
-uint8_t NUNU_parse(DataPacket *dataPacket, char * origin) {
+uint8_t NUNU_parse(DataPacket *dataPacket, char * origin, uint16_t len) {
     NUNU_clear(dataPacket);
 
 
@@ -64,8 +66,10 @@ uint8_t NUNU_parse(DataPacket *dataPacket, char * origin) {
 
             memcpy(dataPacket->serializedArray, origin, 1 + PAYLOAD_LENGTH + NONCE_LENGTH);
         } else {
-            memcpy(dataPacket->serializedArray, origin, strlen(origin));
+            memcpy(dataPacket->serializedArray, origin, len);
         }
+    #else
+        memcpy(dataPacket->serializedArray, origin, len);
     #endif
 
 

@@ -101,9 +101,10 @@ void APRS_display_received(AX25UIFrame* frame, char * field) {
 		);
 }
 
-uint8_t APRS_parse(AX25UIFrame* frame, char * origin) {
+uint8_t APRS_parse(AX25UIFrame* frame, char * origin, uint16_t len) {
     AX25_clear(frame);
-    // TODO:
+    // TODO: These lines are just for skipping warnings.
     frame->readable = *origin;
+    frame->len = len;
     return false;
 }

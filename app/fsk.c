@@ -23,7 +23,7 @@ char transit_buffer[TRANSIT_BUFFER_SIZE];
 
 uint16_t gFSKWriteIndex = 0;
 
-void (*FSK_receive_callback)(char*);
+void (*FSK_receive_callback)(char*, uint16_t);
 
 ModemStatus modem_status = READY;
 
@@ -97,7 +97,6 @@ int8_t FSK_encode_nrzi(char *buffer, size_t length, uint8_t initial_nrzi_state) 
         return -1;
     }
 
-    // Initialize NRZI state (typically starts at 1)
     uint8_t nrzi_state = initial_nrzi_state;
 
     char original_byte;
@@ -148,25 +147,55 @@ char* FSK_find_end_of_sync_words(char* buffer, uint16_t buffer_length) {
     sync_pattern[2] = (char)(processed_sync_23 & 0xFF);
     sync_pattern[3] = (char)((processed_sync_23 >> 8) & 0xFF);
 
-    uint16_t i = 0;
-    while (i + 3 < buffer_length) {
-        if (buffer[i] != sync_pattern[0] ||
-            buffer[i+1] != sync_pattern[1] ||
-            buffer[i+2] != sync_pattern[2] ||
-            buffer[i+3] != sync_pattern[3]) {
+    // First, find the start of a sync pattern
+    uint16_t start_idx = 0;
+    uint8_t found_start = 0;
+    
+    // Look for the first occurrence of a complete sync pattern
+    for (start_idx = 0; start_idx <= buffer_length - 4; start_idx++) {
+        if (buffer[start_idx] == sync_pattern[0] &&
+            buffer[start_idx+1] == sync_pattern[1] &&
+            buffer[start_idx+2] == sync_pattern[2] &&
+            buffer[start_idx+3] == sync_pattern[3]) {
+            found_start = 1;
+            break;
+        }
+    }
+    
+    if (!found_start) {
+        // No complete sync pattern found in the buffer
+        return buffer; // Return the beginning of the buffer as fallback
+    }
+    
+    // Now find where the repeated sync patterns end
+    uint16_t i = start_idx;
+    while (i <= buffer_length - 4) {
+        if (buffer[i] == sync_pattern[0] &&
+            buffer[i+1] == sync_pattern[1] &&
+            buffer[i+2] == sync_pattern[2] &&
+            buffer[i+3] == sync_pattern[3]) {
+            // Found a sync pattern, skip it
+            i += 4;
+        } else {
+            // Found non-sync pattern
             return &buffer[i];
         }
-        i += 4;
     }
-
-    // If we've reached this point, the entire buffer is sync words
-    return NULL;
+    
+    // If we've reached this point, the entire buffer after start_idx is sync words
+    // or there's not enough data left to form a complete non-sync pattern
+    if (i < buffer_length) {
+        return &buffer[i]; // Return pointer to remaining partial data
+    }
+    
+    return NULL; // No non-sync data found
 }
+
 
 void FSK_init(
     uint16_t sync_01,
     uint16_t sync_23,
-    void (*receive_callback)(char*)
+    void (*receive_callback)(char*, uint16_t)
 ) {
     modem_status = READY;
     FSK_receive_callback = receive_callback;
@@ -225,12 +254,14 @@ void FSK_store_packet_interrupt(const uint16_t interrupt_bits) {
 		if (gFSKWriteIndex > 2) {
             if(FSK_receive_callback){
                 if(gEeprom.FSK_CONFIG.data.nrzi) {
+                    FSK_decode_nrzi(transit_buffer, gFSKWriteIndex, nrzi_sync_state);
                     char * beginning = FSK_find_end_of_sync_words(transit_buffer, gFSKWriteIndex);
-                    uint16_t new_len = gFSKWriteIndex - (beginning - transit_buffer);
-                    FSK_decode_nrzi(beginning, new_len, nrzi_sync_state);
-                    FSK_receive_callback(beginning); // Potentially refiring an Ack.
+                    if(beginning) { // please don't send a null pointer to the callback.
+                        uint16_t new_len = gFSKWriteIndex - (beginning - transit_buffer);
+                        FSK_receive_callback(beginning, new_len); // Potentially refiring an Ack.
+                    }
                 }
-                FSK_receive_callback(transit_buffer); // Potentially refiring an Ack.
+                FSK_receive_callback(transit_buffer, gFSKWriteIndex); // Potentially refiring an Ack.
             }
 		}
 		gFSKWriteIndex = 0;
@@ -599,7 +630,7 @@ void FSK_send_data(char * data, uint16_t len) {
             transit_buffer[i*4 + 2] = (uint8_t)(_sync_23 & 0xFF);        // Low byte of second sync word
             transit_buffer[i*4 + 3] = (uint8_t)((_sync_23 >> 8) & 0xFF); // High byte of second sync word
         }
-        FSK_encode_nrzi(transit_buffer, len, nrzi_sync_state);
+        FSK_encode_nrzi(transit_buffer, (4 * NRZI_PREAMBLE) + len, nrzi_sync_state);
     } else {
         memcpy(transit_buffer, data, len);
     }

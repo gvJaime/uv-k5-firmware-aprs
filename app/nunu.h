@@ -42,6 +42,6 @@ uint16_t NUNU_prepare_message(DataPacket *dataPacket, const char * message);
 void NUNU_prepare_ack(DataPacket *dataPacket);
 void NUNU_clear(DataPacket *dataPacket);
 void NUNU_display_received(DataPacket *dataPacket, char * field);
-uint8_t NUNU_parse(DataPacket *dataPacket, char * origin);
+uint8_t NUNU_parse(DataPacket *dataPacket, char * origin, uint16_t len);
 
 #endif

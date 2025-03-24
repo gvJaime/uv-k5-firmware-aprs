@@ -160,18 +160,19 @@ void MSG_SendAck() {
 	#endif
 }
 
-void MSG_HandleReceive(char * receive_buffer) {
+void MSG_HandleReceive(char * receive_buffer, uint16_t len) {
 	
 
 	#ifdef ENABLE_APRS
 		uint8_t send_ack = 0;
-		uint8_t valid = APRS_parse(&ax25frame, receive_buffer);
+		uint8_t valid = APRS_parse(&ax25frame, receive_buffer, len);
 	#else
-		uint8_t valid = NUNU_parse(&dataPacket, receive_buffer);
+		uint8_t valid = NUNU_parse(&dataPacket, receive_buffer, len);
 	#endif
 
 	if(!valid) {
-		snprintf(rxMessage[3], MESSAGE_LENGTH + 2, "ERROR: INVALID PACKET.");
+		NUNU_display_received(&dataPacket, rxMessage[3]); //FIXME: DEBUG :ERASE THIS
+		// snprintf(rxMessage[3], MESSAGE_LENGTH + 2, "ERROR: INVALID PACKET."); //FIXME: UNCOMMENT
 	} else {
 		moveUP(rxMessage);
 		#ifdef ENABLE_APRS

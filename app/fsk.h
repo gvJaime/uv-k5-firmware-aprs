@@ -36,7 +36,7 @@ extern ModemStatus modem_status;
 void FSK_init(
   uint16_t sync_01,
   uint16_t sync_23,
-  void (*receive_callback)(char*)
+  void (*receive_callback)(char*, uint16_t)
 );
 void FSK_configure();
 void FSK_disable_rx();

@@ -61,7 +61,7 @@ void MSG_SendPacket(char * packet, uint16_t len);
 #else
   void MSG_SendAck();
 #endif
-void MSG_HandleReceive(char * receive_buffer);
+void MSG_HandleReceive(char * receive_buffer, uint16_t len);
 void MSG_Send(char *cMessage);
 
 #endif
