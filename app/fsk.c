@@ -142,10 +142,10 @@ void FSK_disable_rx() {
 
 char* FSK_find_end_of_sync_words(char* buffer, uint16_t buffer_length) {
     char sync_pattern[4];
-    sync_pattern[0] = (char)(processed_sync_01 & 0xFF);
-    sync_pattern[1] = (char)((processed_sync_01 >> 8) & 0xFF);
-    sync_pattern[2] = (char)(processed_sync_23 & 0xFF);
-    sync_pattern[3] = (char)((processed_sync_23 >> 8) & 0xFF);
+    sync_pattern[0] = (char)(_sync_01 & 0xFF);
+    sync_pattern[1] = (char)((_sync_01 >> 8) & 0xFF);
+    sync_pattern[2] = (char)(_sync_23 & 0xFF);
+    sync_pattern[3] = (char)((_sync_23 >> 8) & 0xFF);
 
     // First, find the start of a sync pattern
     uint16_t start_idx = 0;
