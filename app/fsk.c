@@ -700,7 +700,11 @@ void FSK_send_data(char * data, uint16_t len) {
 
 
     uint16_t old_length = FSK_get_data_length();
-    FSK_set_data_length(len);
+    if(gEeprom.FSK_CONFIG.data.nrzi)
+        FSK_set_data_length((4 * NRZI_PREAMBLE) + len);
+    else
+        FSK_set_data_length(len);
+
 
     // Enable FSK TX
     BK4819_FskEnableTx();
