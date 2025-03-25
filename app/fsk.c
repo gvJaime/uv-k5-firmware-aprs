@@ -229,18 +229,23 @@ void FSK_store_packet_interrupt(const uint16_t interrupt_bits) {
 	}
 
 	if (rx_fifo_almost_full && modem_status == RECEIVING) {
+        if(rx_sync) {
+            // if it's filling with sync words, erase them.
+            const uint16_t fsk_reg59 = BK4819_ReadRegister(BK4819_REG_59);
+            BK4819_WriteRegister(BK4819_REG_59, (1u << 14) | fsk_reg59);
+        } else {
 
-		const uint16_t count = BK4819_ReadRegister(BK4819_REG_5E) & (7u << 0);  // almost full threshold
-		for (uint16_t i = 0; i < count; i++) {
-			const uint16_t word = BK4819_ReadRegister(BK4819_REG_5F);
-            if (gFSKWriteIndex < sizeof(transit_buffer))
-                transit_buffer[gFSKWriteIndex++] = (word >> 0) & 0xff;
-            if (gFSKWriteIndex < sizeof(transit_buffer))
-                transit_buffer[gFSKWriteIndex++] = (word >> 8) & 0xff;
-		}
+            const uint16_t count = BK4819_ReadRegister(BK4819_REG_5E) & (7u << 0);  // almost full threshold
+            for (uint16_t i = 0; i < count; i++) {
+                const uint16_t word = BK4819_ReadRegister(BK4819_REG_5F);
+                if (gFSKWriteIndex < sizeof(transit_buffer))
+                    transit_buffer[gFSKWriteIndex++] = (word >> 0) & 0xff;
+                if (gFSKWriteIndex < sizeof(transit_buffer))
+                    transit_buffer[gFSKWriteIndex++] = (word >> 8) & 0xff;
+            }
 
-		SYSTEM_DelayMs(10);
-
+            SYSTEM_DelayMs(10);
+        }
 	}
 
 	if (rx_finished) {
