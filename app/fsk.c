@@ -291,7 +291,7 @@ uint16_t FSK_set_data_length(uint16_t len) {
     // Write the modified value back to the register
     BK4819_WriteRegister(BK4819_REG_5D, new_value);
     
-    return len;
+    return rounded_length;
 }
 
 
@@ -701,10 +701,11 @@ void FSK_send_data(char * data, uint16_t len) {
 
 
     uint16_t old_length = FSK_get_data_length();
+    uint16_t transmit_len;
     if(gEeprom.FSK_CONFIG.data.nrzi)
-        FSK_set_data_length((4 * NRZI_PREAMBLE) + len);
+        transmit_len = FSK_set_data_length((4 * NRZI_PREAMBLE) + len);
     else
-        FSK_set_data_length(len);
+        transmit_len = FSK_set_data_length(len);
 
 
     // Enable FSK TX
@@ -717,17 +718,18 @@ void FSK_send_data(char * data, uint16_t len) {
 
     // use full FIFO on first pass
     uint16_t tx_index = 0;
-    for (uint16_t j = 0; tx_index < len && j < TX_FIFO_SEGMENT + TX_FIFO_THRESHOLD; tx_index += 2, j++) {
-        if (tx_index + 1 < len) {
+    for (uint16_t j = 0; tx_index < transmit_len && j < TX_FIFO_SEGMENT + TX_FIFO_THRESHOLD; tx_index += 2, j++) {
+        if (tx_index + 1 < transmit_len) {
             BK4819_WriteRegister(BK4819_REG_5F, (transit_buffer[tx_index + 1] << 8) | transit_buffer[tx_index]);
         } else {
             // Handle odd length by padding with zero
             BK4819_WriteRegister(BK4819_REG_5F, 0x00 | transit_buffer[tx_index]);
         }
     }
-    while(tx_index < len) {
-        // Allow up to 310ms for the TX to complete
-        uint16_t timeout = 1290;
+    do {
+
+        // Allow up to 1s
+        uint16_t timeout = 1000 / 5;
 
         while (timeout-- > 0)
         {
@@ -748,8 +750,8 @@ void FSK_send_data(char * data, uint16_t len) {
                     reg_02 &= ~BK4819_REG_02_FSK_FIFO_ALMOST_EMPTY;
 
                     // if tx is not finished, load segment.
-                    for (uint16_t j = 0; tx_index < len && j < TX_FIFO_SEGMENT; tx_index += 2, j++) {
-                        if (tx_index + 1 < len) {
+                    for (uint16_t j = 0; tx_index < transmit_len && j < TX_FIFO_SEGMENT; tx_index += 2, j++) {
+                        if (tx_index + 1 < transmit_len) {
                             BK4819_WriteRegister(BK4819_REG_5F, (transit_buffer[tx_index + 1] << 8) | transit_buffer[tx_index]);
                         } else {
                             // Handle odd length by padding with zero
@@ -763,9 +765,10 @@ void FSK_send_data(char * data, uint16_t len) {
             }
         }
 
-        if(tx_index >= len || timeout == 0) // also exit if any segment timed out
+        if(timeout == 0) // also exit if any segment timed out
             break;
-    }
+
+    } while(tx_index < transmit_len);
 
 
 
