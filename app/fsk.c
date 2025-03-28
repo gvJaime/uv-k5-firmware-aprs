@@ -260,8 +260,9 @@ void FSK_store_packet_interrupt(const uint16_t interrupt_bits) {
                         uint16_t new_len = gFSKWriteIndex - (beginning - transit_buffer);
                         FSK_receive_callback(beginning, new_len); // Potentially refiring an Ack.
                     }
+                } else {
+                    FSK_receive_callback(transit_buffer, gFSKWriteIndex); // Potentially refiring an Ack.
                 }
-                FSK_receive_callback(transit_buffer, gFSKWriteIndex); // Potentially refiring an Ack.
             }
 		}
 		gFSKWriteIndex = 0;
