@@ -716,9 +716,8 @@ void FSK_send_data(char * data, uint16_t len) {
 	SYSTEM_DelayMs(100);
 
 
-    // use full FIFO on first pass
     uint16_t tx_index = 0;
-    for (uint16_t j = 0; tx_index < transmit_len && j < TX_FIFO_SEGMENT + TX_FIFO_THRESHOLD; tx_index += 2, j++) {
+    for (uint16_t j = 0; tx_index < transmit_len && j < TX_FIFO_THRESHOLD; tx_index += 2, j++) {
         if (tx_index + 1 < transmit_len) {
             BK4819_WriteRegister(BK4819_REG_5F, (transit_buffer[tx_index + 1] << 8) | transit_buffer[tx_index]);
         } else {
@@ -727,6 +726,14 @@ void FSK_send_data(char * data, uint16_t len) {
         }
     }
     do {
+        for (uint16_t j = 0; tx_index < transmit_len && j < TX_FIFO_SEGMENT; tx_index += 2, j++) {
+            if (tx_index + 1 < transmit_len) {
+                BK4819_WriteRegister(BK4819_REG_5F, (transit_buffer[tx_index + 1] << 8) | transit_buffer[tx_index]);
+            } else {
+                // Handle odd length by padding with zero
+                BK4819_WriteRegister(BK4819_REG_5F, 0x00 | transit_buffer[tx_index]);
+            }
+        }
 
         // Allow up to 1s
         uint16_t timeout = 1000 / 5;
@@ -748,16 +755,7 @@ void FSK_send_data(char * data, uint16_t len) {
                 else if (reg_02 & (BK4819_REG_02_FSK_FIFO_ALMOST_EMPTY))
                 {
                     reg_02 &= ~BK4819_REG_02_FSK_FIFO_ALMOST_EMPTY;
-
-                    // if tx is not finished, load segment.
-                    for (uint16_t j = 0; tx_index < transmit_len && j < TX_FIFO_SEGMENT; tx_index += 2, j++) {
-                        if (tx_index + 1 < transmit_len) {
-                            BK4819_WriteRegister(BK4819_REG_5F, (transit_buffer[tx_index + 1] << 8) | transit_buffer[tx_index]);
-                        } else {
-                            // Handle odd length by padding with zero
-                            BK4819_WriteRegister(BK4819_REG_5F, 0x00 | transit_buffer[tx_index]);
-                        }
-                    }
+                    break;
                 }
                 
                 // Clear only the flags we've handled
