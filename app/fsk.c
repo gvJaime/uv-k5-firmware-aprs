@@ -15,9 +15,11 @@
 
 #define TX_FIFO_SEGMENT 64u
 #define TX_FIFO_THRESHOLD 64u
-#define RX_FIFO_THRESHOLD 1u
+#define RX_FIFO_THRESHOLD 4u
 
 #define NRZI_PREAMBLE 15u
+
+#define RX_DATA_LENGTH 32u
 
 char transit_buffer[TRANSIT_BUFFER_SIZE];
 
@@ -698,9 +700,6 @@ void FSK_send_data(char * data, uint16_t len) {
 	const uint16_t filt_val = BK4819_ReadRegister(BK4819_REG_2B);
 	BK4819_WriteRegister(BK4819_REG_2B, (1u << 2) | (1u << 0));
 	
-
-
-    uint16_t old_length = FSK_get_data_length();
     uint16_t transmit_len;
     if(gEeprom.FSK_CONFIG.data.nrzi)
         transmit_len = FSK_set_data_length((4 * NRZI_PREAMBLE) + len);
@@ -805,7 +804,7 @@ void FSK_send_data(char * data, uint16_t len) {
     FSK_disable_tx();
     if(gEeprom.FSK_CONFIG.data.receive){
         BK4819_FskEnableRx();
-        FSK_set_data_length(old_length);
+        FSK_set_data_length(RX_DATA_LENGTH);
     }
     modem_status = READY;
 }
