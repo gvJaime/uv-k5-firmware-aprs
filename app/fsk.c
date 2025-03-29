@@ -226,6 +226,8 @@ void FSK_store_packet_interrupt(const uint16_t interrupt_bits) {
 		#endif
 		gFSKWriteIndex = 0;
 		modem_status = RECEIVING;
+		BK4819_ToggleGpioOut(BK4819_GPIO5_PIN1_RED, true);
+
 	}
 
 	if (rx_fifo_almost_full && modem_status == RECEIVING) {
@@ -246,6 +248,7 @@ void FSK_store_packet_interrupt(const uint16_t interrupt_bits) {
 	if (rx_finished) {
 		// turn off green LED
 		BK4819_ToggleGpioOut(BK4819_GPIO6_PIN2_GREEN, 0);
+		BK4819_ToggleGpioOut(BK4819_GPIO5_PIN1_RED, false);
 		BK4819_FskClearFifo();
         if(gEeprom.FSK_CONFIG.data.receive)
             BK4819_FskEnableRx();
