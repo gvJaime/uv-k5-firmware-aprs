@@ -36,6 +36,8 @@ uint16_t processed_sync_01;
 uint16_t processed_sync_23;
 uint8_t nrzi_sync_state;
 
+uint16_t FSK_set_data_length(uint16_t len);
+
 /**
  * Decodes an NRZI (Non-Return-to-Zero Inverted) encoded buffer back to its original form
  * where '0' caused a state change and '1' maintained the state during encoding
@@ -205,8 +207,10 @@ void FSK_init(
     _sync_01 = sync_01;
     FSK_configure();
     FSK_disable_tx();
-    if(gEeprom.FSK_CONFIG.data.receive)
+    if(gEeprom.FSK_CONFIG.data.receive) {
         BK4819_FskEnableRx();
+        FSK_set_data_length(RX_DATA_LENGTH);
+    }
 }
 
 void FSK_store_packet_interrupt(const uint16_t interrupt_bits) {
