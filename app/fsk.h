@@ -26,8 +26,9 @@ typedef enum ModemModulation {
 
 typedef enum ModemStatus {
   READY,
-  SENDING,
+  SYNCING,
   RECEIVING,
+  SENDING,
 } ModemStatus;
 
 extern ModemStatus modem_status;
@@ -42,6 +43,7 @@ void FSK_configure();
 void FSK_disable_rx();
 void FSK_send_data(char * data, uint16_t len);
 void FSK_store_packet_interrupt(const uint16_t interrupt_bits);
+void FSK_end_rx();
 
 
 #endif

@@ -220,58 +220,93 @@ void FSK_store_packet_interrupt(const uint16_t interrupt_bits) {
 	//UART_printf("\nMSG : S%i, F%i, E%i | %i", rx_sync, rx_fifo_almost_full, rx_finished, interrupt_bits);
 
 	if (rx_sync) {
-		#ifdef ENABLE_MESSENGER_FSK_MUTE
-			// prevent listening to fsk data and squelch (kamilsss655)
-			// CTCSS codes seem to false trigger the rx_sync
-			if(gCurrentCodeType == CODE_TYPE_OFF)
-				AUDIO_AudioPathOff();
-		#endif
-		gFSKWriteIndex = 0;
-		modem_status = RECEIVING;
-        BK4819_ToggleGpioOut(BK4819_GPIO5_PIN1_RED, true);
+        switch(modem_status) {
+            case READY:
+                modem_status = SYNCING;
+                #ifdef ENABLE_MESSENGER_FSK_MUTE
+                    // prevent listening to fsk data and squelch (kamilsss655)
+                    // CTCSS codes seem to false trigger the rx_sync
+                    if(gCurrentCodeType == CODE_TYPE_OFF)
+                        AUDIO_AudioPathOff();
+                #endif
+                gFSKWriteIndex = 0;
+                break;
+            case SYNCING:
+                break;
+            case RECEIVING:
+                break;
+            case SENDING:
+                break;
+        }
+	
 	}
 
-	if (rx_fifo_almost_full && modem_status == RECEIVING) {
-
-		const uint16_t count = BK4819_ReadRegister(BK4819_REG_5E) & (7u << 0);  // almost full threshold
-		for (uint16_t i = 0; i < count; i++) {
-			const uint16_t word = BK4819_ReadRegister(BK4819_REG_5F);
-            if (gFSKWriteIndex < sizeof(transit_buffer))
-                transit_buffer[gFSKWriteIndex++] = (word >> 0) & 0xff;
-            if (gFSKWriteIndex < sizeof(transit_buffer))
-                transit_buffer[gFSKWriteIndex++] = (word >> 8) & 0xff;
-		}
+	if (rx_fifo_almost_full) {
+        switch(modem_status) {
+            case READY:
+                break;
+            case SYNCING:
+                BK4819_ToggleGpioOut(BK4819_GPIO5_PIN1_RED, true);
+                [[fallthrough]];
+            case RECEIVING:
+                modem_status = RECEIVING;
+                const uint16_t count = BK4819_ReadRegister(BK4819_REG_5E) & (7u << 0);  // almost full threshold
+                for (uint16_t i = 0; i < count; i++) {
+                    const uint16_t word = BK4819_ReadRegister(BK4819_REG_5F);
+                    if (gFSKWriteIndex < sizeof(transit_buffer))
+                        transit_buffer[gFSKWriteIndex++] = (word >> 0) & 0xff;
+                    if (gFSKWriteIndex < sizeof(transit_buffer))
+                        transit_buffer[gFSKWriteIndex++] = (word >> 8) & 0xff;
+                }
+                break;
+            case SENDING:
+                break;
+        }
 
 		SYSTEM_DelayMs(10);
 
 	}
 
 	if (rx_finished) {
-		// turn off the LEDs
-		BK4819_ToggleGpioOut(BK4819_GPIO6_PIN2_GREEN, 0);
-        BK4819_ToggleGpioOut(BK4819_GPIO5_PIN1_RED, false);
-		BK4819_FskClearFifo();
-        if(gEeprom.FSK_CONFIG.data.receive)
-            BK4819_FskEnableRx();
-		modem_status = READY;
-
-		if (gFSKWriteIndex > 2) {
-            if(FSK_receive_callback){
-                if(gEeprom.FSK_CONFIG.data.nrzi) {
-                    FSK_decode_nrzi(transit_buffer, gFSKWriteIndex, nrzi_sync_state);
-                    char * beginning = FSK_find_end_of_sync_words(transit_buffer, gFSKWriteIndex);
-                    if(beginning) { // please don't send a null pointer to the callback.
-                        uint16_t new_len = gFSKWriteIndex - (beginning - transit_buffer);
-                        FSK_receive_callback(beginning, new_len); // Potentially refiring an Ack.
-                    }
-                } else {
-                    FSK_receive_callback(transit_buffer, gFSKWriteIndex); // Potentially refiring an Ack.
-                }
-            }
-		}
-		gFSKWriteIndex = 0;
-        memset(transit_buffer, 0, TRANSIT_BUFFER_SIZE);
+        switch(modem_status) {
+            case READY:
+                break;
+            case SYNCING:
+                break;
+            case RECEIVING:
+                FSK_end_rx();
+                break;
+            case SENDING:
+                break;
+        }
 	}
+}
+
+void FSK_end_rx() {
+    // turn off the LEDs
+    BK4819_ToggleGpioOut(BK4819_GPIO6_PIN2_GREEN, 0);
+    BK4819_ToggleGpioOut(BK4819_GPIO5_PIN1_RED, false);
+    BK4819_FskClearFifo();
+    if(gEeprom.FSK_CONFIG.data.receive)
+        BK4819_FskEnableRx();
+    modem_status = READY;
+
+    if (gFSKWriteIndex > 2) {
+        if(FSK_receive_callback){
+            if(gEeprom.FSK_CONFIG.data.nrzi) {
+                FSK_decode_nrzi(transit_buffer, gFSKWriteIndex, nrzi_sync_state);
+                char * beginning = FSK_find_end_of_sync_words(transit_buffer, gFSKWriteIndex);
+                if(beginning) { // please don't send a null pointer to the callback.
+                    uint16_t new_len = gFSKWriteIndex - (beginning - transit_buffer);
+                    FSK_receive_callback(beginning, new_len); // Potentially refiring an Ack.
+                }
+            } else {
+                FSK_receive_callback(transit_buffer, gFSKWriteIndex); // Potentially refiring an Ack.
+            }
+        }
+    }
+    gFSKWriteIndex = 0;
+    memset(transit_buffer, 0, TRANSIT_BUFFER_SIZE);
 }
 
 uint16_t FSK_set_data_length(uint16_t len) {
