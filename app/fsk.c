@@ -19,7 +19,7 @@
 
 #define NRZI_PREAMBLE 15u
 
-#define RX_DATA_LENGTH 32u
+#define RX_DATA_LENGTH 512u
 
 char transit_buffer[TRANSIT_BUFFER_SIZE];
 
