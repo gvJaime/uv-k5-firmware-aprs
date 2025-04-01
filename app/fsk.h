@@ -21,7 +21,8 @@ typedef union {
 typedef enum ModemModulation {
   MOD_FSK_450,   // for bad conditions
   MOD_FSK_700,   // for medium conditions
-  MOD_AFSK_1200  // for good conditions
+  MOD_AFSK_1200,  // for good conditions
+  MOD_BELL_202
 } ModemModulation;
 
 typedef enum ModemStatus {

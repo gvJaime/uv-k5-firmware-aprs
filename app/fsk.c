@@ -357,9 +357,7 @@ uint16_t FSK_get_data_length() {
 
 
 void FSK_configure() {
-    #ifdef ENABLE_APRS
-        uint16_t TONE1_FREQ;
-    #endif
+    uint16_t TONE1_FREQ;
     uint16_t TONE2_FREQ;
     // REG_70
     //
@@ -380,9 +378,8 @@ void FSK_configure() {
     switch(gEeprom.FSK_CONFIG.data.modulation)
     {
         case MOD_AFSK_1200:
-            #ifdef ENABLE_APRS
-                TONE1_FREQ = 22714u;
-            #endif
+        case MOD_BELL_202:
+            TONE1_FREQ = 22714u;
             TONE2_FREQ = 12389u;
             break;
         case MOD_FSK_700:
@@ -395,28 +392,17 @@ void FSK_configure() {
 
     switch(gEeprom.FSK_CONFIG.data.modulation)
     {
-        case MOD_AFSK_1200:
-            #ifdef ENABLE_APRS
-                BK4819_WriteRegister(BK4819_REG_70,
-                    ( 1u << 15) |    // 1 // APRS uses both tones
-                    ( 0u <<  8) |    // 0
-                    ( 1u <<  7) |    // 1
-                    (96u <<  0));    // 96
+        case MOD_BELL_202:
+            BK4819_WriteRegister(BK4819_REG_70,
+                ( 1u << 15) |    // 1
+                ( 0u <<  8) |    // 0
+                ( 1u <<  7) |    // 1
+                (96u <<  0));    // 96
 
-                // TONE 1
-                BK4819_WriteRegister(BK4819_REG_71, TONE1_FREQ);
-                // TONE 2
-                BK4819_WriteRegister(BK4819_REG_72, TONE2_FREQ);
-            #else
-                BK4819_WriteRegister(BK4819_REG_70,
-                    ( 0u << 15) |    // 0
-                    ( 0u <<  8) |    // 0
-                    ( 1u <<  7) |    // 1
-                    (96u <<  0));    // 96
-
-                // TONE 2
-                BK4819_WriteRegister(BK4819_REG_72, TONE2_FREQ);
-            #endif
+            // TONE 1
+            BK4819_WriteRegister(BK4819_REG_71, TONE1_FREQ);
+            // TONE 2
+            BK4819_WriteRegister(BK4819_REG_72, TONE2_FREQ);
             break;
         default:
             BK4819_WriteRegister(BK4819_REG_70,
@@ -482,103 +468,102 @@ void FSK_configure() {
                                     //   0 = disable
                                     //   1 = enable
         break;
+        case MOD_BELL_202:
+            BK4819_WriteRegister(BK4819_REG_58,
+                (1u << 13) |		// 1 FSK TX mode selection
+                                    //   0 = FSK 1.2K and FSK 2.4K TX .. no tones, direct FM
+                                    //   1 = FFSK 1200 / 1800 TX
+                                    //   2 = ???
+                                    //   3 = FFSK 1200 / 2400 TX
+                                    //   4 = ???
+                                    //   5 = NOAA SAME TX
+                                    //   6 = ???
+                                    //   7 = ???
+                                    //
+                (7u << 10) |		// 0 FSK RX mode selection
+                                    //   0 = FSK 1.2K, FSK 2.4K RX and NOAA SAME RX .. no tones, direct FM
+                                    //   1 = ???
+                                    //   2 = ???
+                                    //   3 = ???
+                                    //   4 = FFSK 1200 / 2400 RX
+                                    //   5 = ???
+                                    //   6 = ???
+                                    //   7 = FFSK 1200 / 1800 RX
+                                    //
+                (3u << 8) |			// 0 FSK RX gain
+                                    //   0 ~ 3
+                                    //
+                (0u << 6) |			// 0 ???
+                                    //   0 ~ 3
+                                    //
+                (0u << 4) |			// 0 FSK preamble type selection
+                                    //   0 = 0xAA or 0x55 due to the MSB of FSK sync byte 0
+                                    //   1 = ???
+                                    //   2 = 0x55
+                                    //   3 = 0xAA
+                                    //
+                (4u << 1) |			// 1 FSK RX bandwidth setting
+                                    //   0 = FSK 1.2K .. no tones, direct FM
+                                    //   1 = FFSK 1200 / 1800
+                                    //   2 = NOAA SAME RX
+                                    //   3 = ???
+                                    //   4 = FSK 2.4K and FFSK 1200 / 2400
+                                    //   5 = ???
+                                    //   6 = ???
+                                    //   7 = ???
+                                    //
+                (1u << 0));			// 1 FSK enable
+                                    //   0 = disable
+                                    //   1 = enable
+            break;
         case MOD_AFSK_1200:
-            #ifdef ENABLE_APRS
-                BK4819_WriteRegister(BK4819_REG_58,
-                    (1u << 13) |		// 1 FSK TX mode selection
-                                        //   0 = FSK 1.2K and FSK 2.4K TX .. no tones, direct FM
-                                        //   1 = FFSK 1200 / 1800 TX
-                                        //   2 = ???
-                                        //   3 = FFSK 1200 / 2400 TX
-                                        //   4 = ???
-                                        //   5 = NOAA SAME TX
-                                        //   6 = ???
-                                        //   7 = ???
-                                        //
-                    (7u << 10) |		// 0 FSK RX mode selection
-                                        //   0 = FSK 1.2K, FSK 2.4K RX and NOAA SAME RX .. no tones, direct FM
-                                        //   1 = ???
-                                        //   2 = ???
-                                        //   3 = ???
-                                        //   4 = FFSK 1200 / 2400 RX
-                                        //   5 = ???
-                                        //   6 = ???
-                                        //   7 = FFSK 1200 / 1800 RX
-                                        //
-                    (3u << 8) |			// 0 FSK RX gain
-                                        //   0 ~ 3
-                                        //
-                    (0u << 6) |			// 0 ???
-                                        //   0 ~ 3
-                                        //
-                    (0u << 4) |			// 0 FSK preamble type selection
-                                        //   0 = 0xAA or 0x55 due to the MSB of FSK sync byte 0
-                                        //   1 = ???
-                                        //   2 = 0x55
-                                        //   3 = 0xAA
-                                        //
-                    (4u << 1) |			// 1 FSK RX bandwidth setting
-                                        //   0 = FSK 1.2K .. no tones, direct FM
-                                        //   1 = FFSK 1200 / 1800
-                                        //   2 = NOAA SAME RX
-                                        //   3 = ???
-                                        //   4 = FSK 2.4K and FFSK 1200 / 2400
-                                        //   5 = ???
-                                        //   6 = ???
-                                        //   7 = ???
-                                        //
-                    (1u << 0));			// 1 FSK enable
-                                        //   0 = disable
-                                        //   1 = enable
-            #else
-                BK4819_WriteRegister(BK4819_REG_58,
-                    (1u << 13) |		// 1 FSK TX mode selection
-                                        //   0 = FSK 1.2K and FSK 2.4K TX .. no tones, direct FM
-                                        //   1 = FFSK 1200 / 1800 TX
-                                        //   2 = ???
-                                        //   3 = FFSK 1200 / 2400 TX
-                                        //   4 = ???
-                                        //   5 = NOAA SAME TX
-                                        //   6 = ???
-                                        //   7 = ???
-                                        //
-                    (7u << 10) |		// 0 FSK RX mode selection
-                                        //   0 = FSK 1.2K, FSK 2.4K RX and NOAA SAME RX .. no tones, direct FM
-                                        //   1 = ???
-                                        //   2 = ???
-                                        //   3 = ???
-                                        //   4 = FFSK 1200 / 2400 RX
-                                        //   5 = ???
-                                        //   6 = ???
-                                        //   7 = FFSK 1200 / 1800 RX
-                                        //
-                    (3u << 8) |			// 0 FSK RX gain
-                                        //   0 ~ 3
-                                        //
-                    (0u << 6) |			// 0 ???
-                                        //   0 ~ 3
-                                        //
-                    (0u << 4) |			// 0 FSK preamble type selection
-                                        //   0 = 0xAA or 0x55 due to the MSB of FSK sync byte 0
-                                        //   1 = ???
-                                        //   2 = 0x55
-                                        //   3 = 0xAA
-                                        //
-                    (1u << 1) |			// 1 FSK RX bandwidth setting
-                                        //   0 = FSK 1.2K .. no tones, direct FM
-                                        //   1 = FFSK 1200 / 1800
-                                        //   2 = NOAA SAME RX
-                                        //   3 = ???
-                                        //   4 = FSK 2.4K and FFSK 1200 / 2400
-                                        //   5 = ???
-                                        //   6 = ???
-                                        //   7 = ???
-                                        //
-                    (1u << 0));			// 1 FSK enable
-                                        //   0 = disable
-                                        //   1 = enable
-            #endif
-        break;
+            BK4819_WriteRegister(BK4819_REG_58,
+                (1u << 13) |		// 1 FSK TX mode selection
+                                    //   0 = FSK 1.2K and FSK 2.4K TX .. no tones, direct FM
+                                    //   1 = FFSK 1200 / 1800 TX
+                                    //   2 = ???
+                                    //   3 = FFSK 1200 / 2400 TX
+                                    //   4 = ???
+                                    //   5 = NOAA SAME TX
+                                    //   6 = ???
+                                    //   7 = ???
+                                    //
+                (7u << 10) |		// 0 FSK RX mode selection
+                                    //   0 = FSK 1.2K, FSK 2.4K RX and NOAA SAME RX .. no tones, direct FM
+                                    //   1 = ???
+                                    //   2 = ???
+                                    //   3 = ???
+                                    //   4 = FFSK 1200 / 2400 RX
+                                    //   5 = ???
+                                    //   6 = ???
+                                    //   7 = FFSK 1200 / 1800 RX
+                                    //
+                (3u << 8) |			// 0 FSK RX gain
+                                    //   0 ~ 3
+                                    //
+                (0u << 6) |			// 0 ???
+                                    //   0 ~ 3
+                                    //
+                (0u << 4) |			// 0 FSK preamble type selection
+                                    //   0 = 0xAA or 0x55 due to the MSB of FSK sync byte 0
+                                    //   1 = ???
+                                    //   2 = 0x55
+                                    //   3 = 0xAA
+                                    //
+                (1u << 1) |			// 1 FSK RX bandwidth setting
+                                    //   0 = FSK 1.2K .. no tones, direct FM
+                                    //   1 = FFSK 1200 / 1800
+                                    //   2 = NOAA SAME RX
+                                    //   3 = ???
+                                    //   4 = FSK 2.4K and FFSK 1200 / 2400
+                                    //   5 = ???
+                                    //   6 = ???
+                                    //   7 = ???
+                                    //
+                (1u << 0));			// 1 FSK enable
+                                    //   0 = disable
+                                    //   1 = enable
+            break;
     }
 
     if(gEeprom.FSK_CONFIG.data.nrzi) {

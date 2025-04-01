@@ -198,7 +198,8 @@ const char gSubMenu_SAVE[][4] =
 	{
 		"FSK 450",
 		"FSK 700",
-		"AFSK 1.2K"
+		"AFSK 1.2K",
+		"Bell 202"
 	};
 #endif
 
