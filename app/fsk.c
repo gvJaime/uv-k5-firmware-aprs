@@ -502,7 +502,7 @@ void FSK_configure() {
                                     //   2 = 0x55
                                     //   3 = 0xAA
                                     //
-                (4u << 1) |			// 1 FSK RX bandwidth setting
+                (1u << 1) |			// 1 FSK RX bandwidth setting
                                     //   0 = FSK 1.2K .. no tones, direct FM
                                     //   1 = FFSK 1200 / 1800
                                     //   2 = NOAA SAME RX
