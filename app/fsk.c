@@ -17,7 +17,7 @@
 #define TX_FIFO_THRESHOLD 64u
 #define RX_FIFO_THRESHOLD 4u
 
-#define NRZI_PREAMBLE 15u
+#define SYNC_PREAMBLE_LEN 15u
 
 #define RX_DATA_LENGTH 512u
 
@@ -298,7 +298,6 @@ void FSK_end_rx() {
     if (gFSKWriteIndex > 2) {
         if(FSK_receive_callback){
             if(gEeprom.FSK_CONFIG.data.nrzi) {
-                FSK_decode_nrzi(transit_buffer, gFSKWriteIndex, nrzi_sync_state);
                 char * beginning = FSK_find_end_of_sync_words(transit_buffer, gFSKWriteIndex);
                 if(beginning) { // please don't send a null pointer to the callback.
                     uint16_t new_len = gFSKWriteIndex - (beginning - transit_buffer);
@@ -566,30 +565,9 @@ void FSK_configure() {
             break;
     }
 
-    if(gEeprom.FSK_CONFIG.data.nrzi) {
-        processed_sync_01 = _sync_01;
-        processed_sync_23 = _sync_23;
-        FSK_encode_nrzi((char*) &processed_sync_01, 2, 1);
-
-        // Calculate final state after first encoding
-        // Get the last byte of processed_sync_01 (assuming little-endian)
-        char last_byte = ((char*)&processed_sync_01)[1];
-        // The last bit processed is the LSB (bit 0)
-        nrzi_sync_state = (last_byte & 0x01) ? 1 : 0;
-
-        // Encode second sync word with the final state from first encoding
-        FSK_encode_nrzi((char*) &processed_sync_23, 2, nrzi_sync_state);
-
-
-        // Get the last byte of processed_sync_23 (assuming little-endian)
-        last_byte = ((char*)&processed_sync_23)[1];
-        // and store it so buffers can be adapted accordingly
-        nrzi_sync_state = (last_byte & 0x01) ? 1 : 0;
-
-    } else {
-        processed_sync_01 = _sync_01;
-        processed_sync_23 = _sync_23;
-    }
+    
+    processed_sync_01 = _sync_01;
+    processed_sync_23 = _sync_23;
 
     // REG_5A .. bytes 0 & 1 sync pattern
     //
@@ -651,15 +629,14 @@ void FSK_send_data(char * data, uint16_t len) {
     if(len == 0) return;
 
     if(gEeprom.FSK_CONFIG.data.nrzi) {
-        memcpy(transit_buffer + 4 * NRZI_PREAMBLE, data, len);
+        memcpy(transit_buffer + 4 * SYNC_PREAMBLE_LEN, data, len);
         // duplicate the sync bytes to increase chances of digital read lock
-        for(uint8_t i = 0; i < NRZI_PREAMBLE; i++) {
+        for(uint8_t i = 0; i < SYNC_PREAMBLE_LEN; i++) {
             transit_buffer[i*4]     = (uint8_t)(_sync_01 & 0xFF);        // Low byte of first sync word
             transit_buffer[i*4 + 1] = (uint8_t)((_sync_01 >> 8) & 0xFF); // High byte of first sync word
             transit_buffer[i*4 + 2] = (uint8_t)(_sync_23 & 0xFF);        // Low byte of second sync word
             transit_buffer[i*4 + 3] = (uint8_t)((_sync_23 >> 8) & 0xFF); // High byte of second sync word
         }
-        FSK_encode_nrzi(transit_buffer, (4 * NRZI_PREAMBLE) + len, nrzi_sync_state);
     } else {
         memcpy(transit_buffer, data, len);
     }
@@ -728,7 +705,7 @@ void FSK_send_data(char * data, uint16_t len) {
 	
     uint16_t transmit_len;
     if(gEeprom.FSK_CONFIG.data.nrzi)
-        transmit_len = FSK_set_data_length((4 * NRZI_PREAMBLE) + len);
+        transmit_len = FSK_set_data_length((4 * SYNC_PREAMBLE_LEN) + len);
     else
         transmit_len = FSK_set_data_length(len);
 
