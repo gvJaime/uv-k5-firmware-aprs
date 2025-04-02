@@ -19,7 +19,7 @@
 
 #define SYNC_PREAMBLE_LEN 15u
 
-#define RX_DATA_LENGTH 512u
+#define RX_DATA_LENGTH 128u
 
 char transit_buffer[TRANSIT_BUFFER_SIZE];
 
